@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 *.log
+*.mcpb
 .DS_Store
 Thumbs.db
 .vscode/
