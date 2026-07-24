@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this MCP server, please cite it as below."
+title: "@page2ai/mcp — MCP server that converts web pages to Markdown"
+abstract: >-
+  Model Context Protocol (MCP) server exposing a single page_to_markdown
+  tool that fetches any web page URL and returns clean Markdown suitable
+  for LLM context. Zero external APIs, SSRF-guarded, runs locally.
+  Compatible with Claude Desktop, Cursor, Windsurf, and Zed.
+type: software
+version: 0.1.1
+date-released: 2026-07-24
+license: MIT
+repository-code: "https://github.com/igorsaevets/page2ai-mcp"
+url: "https://igorsaevets.github.io/page2ai-docs/mcp/"
+authors:
+  - given-names: Igor
+    family-names: Saevets
+    orcid: "https://orcid.org/0009-0006-8636-1377"
+    email: igorsaevets@gmail.com
+    website: "https://igorsaevets.github.io/page2ai-docs/about/"
+keywords:
+  - mcp
+  - model-context-protocol
+  - html-to-markdown
+  - llm
+  - claude
+  - page2ai
+  - anthropic
+identifiers:
+  - type: url
+    value: "https://www.npmjs.com/package/@page2ai/mcp"
+    description: npm package
+  - type: url
+    value: "https://registry.modelcontextprotocol.io/v0/servers?search=page2ai"
+    description: MCP Registry entry
