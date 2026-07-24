@@ -104,6 +104,10 @@ Future versions will support options via tool arguments:
 
 `@page2ai/mcp` collects no data, sends no telemetry, and makes no external network calls beyond the URLs you explicitly provide. See [PRIVACY.md](./PRIVACY.md) for details.
 
+## Known advisories
+
+`npm audit` will surface a moderate finding in `@hono/node-server` (a transitive dependency of `@modelcontextprotocol/sdk`). That vulnerability lives in the SDK's HTTP/OAuth server path; `@page2ai/mcp` uses only the stdio transport and never loads that code path, so it is not exploitable through this package. The audit line will clear once the SDK bumps its Hono constraint to `>=2.0.5`.
+
 ## Development
 
 ```bash
@@ -132,4 +136,5 @@ MIT — see [LICENSE](./LICENSE). Copyright © 2026 Igor Saevets.
 
 - **Page2AI Chrome extension** — https://github.com/igorsaevets/page2ai-extension (same extraction core, distributed as a browser extension for humans)
 - **@page2ai/core** — https://npmjs.com/package/@page2ai/core (the shared extraction library)
+- **page2ai-mcp** (unscoped) — https://npmjs.com/package/page2ai-mcp (thin wrapper around this package, published so `npx -y page2ai-mcp` works without a scope prefix)
 - **Software Heritage archive** — SWHID `swh:1:snp:05123c51ef9e7c0aeb06f42b1263c07a8d26999a`
