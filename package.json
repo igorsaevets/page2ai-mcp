@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@page2ai/core": "file:../page2ai-core",
+    "@page2ai/core": "^0.1.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
