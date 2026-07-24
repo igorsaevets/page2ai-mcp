@@ -1,0 +1,69 @@
+{
+  "name": "@page2ai/mcp",
+  "version": "0.1.0",
+  "description": "MCP server that converts any web page URL to clean Markdown for LLM context. Zero external API calls, SSRF-guarded, 100% local.",
+  "type": "module",
+  "bin": {
+    "page2ai-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "PRIVACY.md",
+    "LICENSE",
+    "manifest.json",
+    "server.json"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node -e \"import('node:fs').then(({chmodSync})=>chmodSync('dist/index.js',0o755))\"",
+    "build:watch": "tsc -p tsconfig.build.json --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@page2ai/core": "file:../page2ai-core",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.7"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "markdown",
+    "html-to-markdown",
+    "webpage-to-markdown",
+    "web-scraping",
+    "llm",
+    "ai",
+    "claude",
+    "cursor",
+    "windsurf",
+    "zed",
+    "rag",
+    "page2ai"
+  ],
+  "author": "Igor Saevets, AI Expert and Entrepreneur",
+  "license": "MIT",
+  "homepage": "https://github.com/igorsaevets/page2ai-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorsaevets/page2ai-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/igorsaevets/page2ai-mcp/issues"
+  }
+}

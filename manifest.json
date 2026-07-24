@@ -1,0 +1,55 @@
+{
+  "manifest_version": "0.3",
+  "name": "page2ai-mcp",
+  "display_name": "Page2AI — Web to Markdown",
+  "version": "0.1.0",
+  "description": "Convert any web page or HTML string to clean Markdown for LLM context",
+  "long_description": "Page2AI MCP converts web pages to Markdown optimized for AI context windows. Extracts main content using DOM-position-aware dedup, preserves code blocks with language hints, converts tables and lists, and strips navigation, ads, and cookie banners. Works offline against local HTML strings or online against URLs. Zero external API calls in v0.1 — pure Node + linkedom.\n\nCompanion to the Page2AI Chrome extension. Shares the same extraction core (@page2ai/core) with the browser extension available at https://github.com/igorsaevets/page2ai-extension.",
+  "author": {
+    "name": "Igor Saevets",
+    "email": "igorsaevets@gmail.com",
+    "url": "https://github.com/igorsaevets"
+  },
+  "repository": "https://github.com/igorsaevets/page2ai-extension",
+  "homepage": "https://github.com/igorsaevets/page2ai-extension",
+  "documentation": "https://github.com/igorsaevets/page2ai-extension#readme",
+  "support": "https://github.com/igorsaevets/page2ai-extension/issues",
+  "icon": "icon.png",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "markdown",
+    "html-to-markdown",
+    "readability",
+    "web-scraping",
+    "llm",
+    "claude",
+    "rag"
+  ],
+  "privacy_policies": [
+    "https://github.com/igorsaevets/page2ai-extension/blob/main/packages/mcp/PRIVACY.md"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "page_to_markdown",
+      "title": "Convert Page to Markdown",
+      "description": "Fetch a web page URL and convert it to clean Markdown. Preserves headings, code blocks, links, and tables; strips ads, navigation, cookie banners, and footers.",
+      "readOnlyHint": true
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
