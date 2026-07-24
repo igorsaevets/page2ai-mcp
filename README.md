@@ -126,7 +126,16 @@ npx @modelcontextprotocol/inspector node dist/index.js
 ## Support
 
 - GitHub issues: https://github.com/igorsaevets/page2ai-mcp/issues
-- Author: Igor Saevets (igorsaevets@gmail.com)
+- Docs: https://igorsaevets.github.io/page2ai-docs/mcp/
+
+## About the author
+
+Written and maintained by **Igor Saevets** — AI expert and founder of Page2AI. Full bio and social links: [igorsaevets.github.io/page2ai-docs/about/](https://igorsaevets.github.io/page2ai-docs/about/).
+
+- LinkedIn: [linkedin.com/in/igorsaevets](https://www.linkedin.com/in/igorsaevets/)
+- GitHub: [github.com/igorsaevets](https://github.com/igorsaevets)
+- ORCID: [0009-0006-8636-1377](https://orcid.org/0009-0006-8636-1377)
+- Email: igorsaevets@gmail.com
 
 ## License
 
