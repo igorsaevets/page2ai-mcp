@@ -137,6 +137,22 @@ Written and maintained by **Igor Saevets** — AI expert and founder of Page2AI.
 - ORCID: [0009-0006-8636-1377](https://orcid.org/0009-0006-8636-1377)
 - Email: igorsaevets@gmail.com
 
+
+## Build provenance
+
+An MCP server runs with the privileges of whatever launched it, so where the tarball came from
+is a security question, not a formality. Releases from v0.1.2 onward are published from GitHub
+Actions with [npm provenance](https://docs.npmjs.com/generating-provenance-statements): each
+version carries a Sigstore attestation naming the commit and workflow run that produced it,
+recorded in the public Rekor transparency ledger and shown as a badge on npmjs.com.
+
+Check it before you trust it:
+
+```bash
+npm audit signatures
+npm view @page2ai/mcp --json | jq '.dist.attestations'
+```
+
 ## License
 
 MIT — see [LICENSE](./LICENSE). Copyright © 2026 Igor Saevets.
