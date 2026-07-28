@@ -58,7 +58,19 @@ jobs:
           fi
           echo "publishing $PKG"
 
+      - name: Check whether the scoped version is already on the registry
+        id: scoped
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          if npm view "@page2ai/mcp@$V" version >/dev/null 2>&1; then
+            echo "@page2ai/mcp@$V is already published; skipping"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish
+        if: steps.scoped.outputs.publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -70,3 +82,31 @@ jobs:
         run: |
           sleep 20
           npm audit signatures || echo "attestation not visible yet; check the package page"
+
+      # The unscoped name is the one people actually type (`npx -y page2ai-mcp`),
+      # and until 2026-07-28 it was the weakest link in the chain: published by
+      # hand in July, so it carries no provenance attestation at all, its source
+      # existed nowhere in this repository, and it sat at 0.1.0 while the scoped
+      # package had moved to 0.1.2. Publishing it from here fixes all three.
+      - name: Check the wrapper version
+        id: wrapper
+        run: |
+          WANT="$(node -p "require('./wrapper/package.json').version")"
+          MAIN="$(node -p "require('./package.json').version")"
+          if [ "$WANT" != "$MAIN" ]; then
+            echo "::error::wrapper/package.json is $WANT but package.json is $MAIN; they must match"
+            exit 1
+          fi
+          if npm view "page2ai-mcp@$WANT" version >/dev/null 2>&1; then
+            echo "page2ai-mcp@$WANT is already published; skipping"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the unscoped wrapper with provenance
+        if: steps.wrapper.outputs.publish == 'true'
+        working-directory: wrapper
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

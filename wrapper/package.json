@@ -1,0 +1,46 @@
+{
+  "name": "page2ai-mcp",
+  "version": "0.1.2",
+  "description": "npx wrapper for @page2ai/mcp — MCP server that converts any web page to clean Markdown. Zero external API calls, SSRF-guarded, 100% local.",
+  "type": "module",
+  "bin": {
+    "page2ai-mcp": "./index.js"
+  },
+  "main": "./index.js",
+  "files": [
+    "index.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@page2ai/mcp": "0.1.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "markdown",
+    "html-to-markdown",
+    "webpage-to-markdown",
+    "llm",
+    "ai",
+    "claude",
+    "page2ai"
+  ],
+  "author": "Igor Saevets, AI Expert and Entrepreneur",
+  "license": "MIT",
+  "homepage": "https://igorsaevets.github.io/page2ai-docs/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/igorsaevets/page2ai-mcp.git",
+    "directory": "wrapper"
+  },
+  "bugs": {
+    "url": "https://github.com/igorsaevets/page2ai-mcp/issues"
+  }
+}
