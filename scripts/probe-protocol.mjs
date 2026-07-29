@@ -29,8 +29,23 @@ const CI = 'io.modelcontextprotocol/clientInfo';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// On Windows npx/npm/pnpm/yarn are .cmd shims. spawn() cannot exec them directly (ENOENT),
+// and since the CVE-2024-27980 mitigation Node refuses `.cmd` outright (EINVAL) -- so the
+// shell is genuinely required there. Without this every arm dies before the server starts
+// and reports "NO RESPONSE", which is indistinguishable from a server that ran and stayed
+// silent. That false negative reads exactly like a finding; it is the control arm measuring
+// nothing at all.
+//
+// The command goes through as ONE string with no separate args array, because passing args
+// *alongside* shell:true is what triggers DEP0190.
+const WIN = process.platform === 'win32';
+const spawnProbe = () =>
+  WIN
+    ? spawn([cmd, ...args].join(' '), { stdio: ['pipe', 'pipe', 'pipe'], shell: true })
+    : spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+
 async function ask(request, label) {
-  const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawnProbe();
   const seen = [];
   const stderr = [];
   let buf = '';
@@ -52,7 +67,17 @@ async function ask(request, label) {
   child.stderr.on('data', (d) => stderr.push(d.toString()));
   child.on('error', (e) => stderr.push(`spawn error: ${e.message}`));
 
-  await wait(1200);
+  // Wait for the server to actually be listening rather than for a fixed delay. A cold
+  // `npx` downloads the package first, which blew past a flat 1200ms and made every arm
+  // report NO RESPONSE -- a timing artifact that reads as "the old version ignores the
+  // request". Poll for the readiness banner on stderr, with a generous ceiling.
+  const READY_MS = 30_000;
+  for (let waited = 0; waited < READY_MS; waited += 100) {
+    if (stderr.join('').includes('ready on stdio')) break;
+    await wait(100);
+  }
+  await wait(300);
+
   child.stdin.write(JSON.stringify(request) + '\n');
   await wait(2500);
   child.kill();
