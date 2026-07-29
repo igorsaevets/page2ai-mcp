@@ -104,9 +104,35 @@ Future versions will support options via tool arguments:
 
 `@page2ai/mcp` collects no data, sends no telemetry, and makes no external network calls beyond the URLs you explicitly provide. See [PRIVACY.md](./PRIVACY.md) for details.
 
+## Protocol revisions
+
+Since 0.2.0 this server answers **both** MCP protocol revisions on the same stdio
+connection:
+
+| Revision | How a client opens the connection | Served |
+|---|---|---|
+| `2026-07-28` | `server/discover`, carrying `io.modelcontextprotocol/protocolVersion` in `_meta` | yes |
+| `2025-11-25` and earlier | the `initialize` handshake | yes |
+
+`serveStdio` picks the era from the opening message and pins one server instance for
+the life of the connection, so clients on older SDKs are unaffected. Note that a
+message carrying no version claim is treated by the specification as a 2025-era
+opening; `server/discover` without that `_meta` field is therefore answered with
+`-32601` rather than being upgraded.
+
+Verify against a build with the raw JSON-RPC frames, without a client library:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}' | node dist/index.js
+```
+
 ## Known advisories
 
-`npm audit` will surface a moderate finding in `@hono/node-server` (a transitive dependency of `@modelcontextprotocol/sdk`). That vulnerability lives in the SDK's HTTP/OAuth server path; `@page2ai/mcp` uses only the stdio transport and never loads that code path, so it is not exploitable through this package. The audit line will clear once the SDK bumps its Hono constraint to `>=2.0.5`.
+None. Moving to the v2 SDK removed 90 transitive packages (117 production
+dependencies down to 26) and with them the `@hono/node-server` advisory that
+0.1.x carried through the monolithic `@modelcontextprotocol/sdk`; that package
+pulled the HTTP and OAuth server stack even for a stdio-only server. `npm audit`
+is clean as of 0.2.0.
 
 ## Development
 

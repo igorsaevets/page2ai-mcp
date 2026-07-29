@@ -4,7 +4,7 @@
 // static tab discovery (emits `### Tab: {label}` sections for docs sites).
 
 import { fetchAndConvert, SsrfBlockedError, FetchProtectionError } from '@page2ai/core';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 export const pageToMarkdownInputSchema = z.object({
@@ -91,8 +91,9 @@ export const handlePageToMarkdown = async (
   try {
     input = pageToMarkdownInputSchema.parse(rawInput);
   } catch (e) {
+    // zod 4 renamed ZodError.errors to .issues; v2 of the MCP SDK requires zod >= 4.2.
     const msg = e instanceof z.ZodError
-      ? e.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join('; ')
+      ? e.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')
       : String(e);
     return errorResult(`Invalid input: ${msg}`);
   }

@@ -1,0 +1,102 @@
+// Raw JSON-RPC stdio probe. Deliberately does NOT use the MCP client SDK, so the
+// evidence is independent of the library under test: it writes bytes, reads bytes.
+//
+//   node probe.mjs <command> [args...]
+//
+// The era is pinned per CONNECTION by the opening message, so each arm gets its
+// own process:
+//   ARM 1  server/discover WITH the 2026-07-28 version claim in _meta
+//   ARM 2  server/discover WITHOUT a claim  (spec: a claim-less message is a 2025 opening)
+//   ARM 3  initialize      — the 2025-11-25 handshake, proving the legacy era still serves
+import { spawn } from 'node:child_process';
+
+const argv = process.argv.slice(2);
+const [cmd, ...args] = argv;
+
+const PV = 'io.modelcontextprotocol/protocolVersion';
+const CC = 'io.modelcontextprotocol/clientCapabilities';
+const CI = 'io.modelcontextprotocol/clientInfo';
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function ask(request, label) {
+  const child = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const seen = [];
+  const stderr = [];
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    buf += d.toString();
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (line) {
+        try {
+          seen.push(JSON.parse(line));
+        } catch {
+          /* non-JSON line on stdout is itself a finding; ignored here */
+        }
+      }
+    }
+  });
+  child.stderr.on('data', (d) => stderr.push(d.toString()));
+  child.on('error', (e) => stderr.push(`spawn error: ${e.message}`));
+
+  await wait(1200);
+  child.stdin.write(JSON.stringify(request) + '\n');
+  await wait(2500);
+  child.kill();
+  await wait(120);
+
+  const r = seen.find((m) => m.id === request.id);
+  let verdict;
+  if (!r) verdict = 'NO RESPONSE';
+  else if (r.error) verdict = `ERROR ${r.error.code} ${r.error.message}`;
+  else verdict = 'OK';
+
+  console.log(`\n### ${label}`);
+  console.log(`    verdict: ${verdict}`);
+  if (r?.result) {
+    const keys = Object.keys(r.result);
+    console.log(`    result keys: ${keys.join(', ')}`);
+    for (const k of ['protocolVersions', 'protocolVersion', 'serverInfo', 'capabilities', 'resultType']) {
+      if (r.result[k] !== undefined) console.log(`    ${k}: ${JSON.stringify(r.result[k])}`);
+    }
+    if (r.result._meta) console.log(`    _meta: ${JSON.stringify(r.result._meta)}`);
+  }
+  const err = stderr.join('').trim();
+  if (err) console.log(`    stderr: ${err.split('\n')[0]}`);
+  return verdict;
+}
+
+const modern = {
+  jsonrpc: '2.0',
+  id: 1,
+  method: 'server/discover',
+  params: {
+    _meta: {
+      [PV]: '2026-07-28',
+      [CC]: {},
+      [CI]: { name: 'raw-probe', version: '0.0.0' },
+    },
+  },
+};
+
+const claimless = { jsonrpc: '2.0', id: 2, method: 'server/discover', params: {} };
+
+const legacy = {
+  jsonrpc: '2.0',
+  id: 3,
+  method: 'initialize',
+  params: {
+    protocolVersion: '2025-11-25',
+    capabilities: {},
+    clientInfo: { name: 'raw-probe', version: '0.0.0' },
+  },
+};
+
+console.log(`=== probing: ${argv.join(' ')} ===`);
+const a = await ask(modern, 'ARM 1  server/discover WITH 2026-07-28 claim');
+const b = await ask(claimless, 'ARM 2  server/discover, claim-less');
+const c = await ask(legacy, 'ARM 3  initialize (2025-11-25)');
+console.log(`\nSUMMARY  modern=${a}  claimless=${b}  legacy=${c}`);
