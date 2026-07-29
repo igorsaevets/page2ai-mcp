@@ -13,6 +13,16 @@ import { spawn } from 'node:child_process';
 const argv = process.argv.slice(2);
 const [cmd, ...args] = argv;
 
+if (!cmd) {
+  console.error(
+    'usage: node scripts/probe-protocol.mjs <command> [args...]\n\n' +
+      'examples:\n' +
+      '  node scripts/probe-protocol.mjs node dist/index.js\n' +
+      '  node scripts/probe-protocol.mjs npx -y page2ai-mcp@0.1.2   # control arm: the previous release\n',
+  );
+  process.exit(2);
+}
+
 const PV = 'io.modelcontextprotocol/protocolVersion';
 const CC = 'io.modelcontextprotocol/clientCapabilities';
 const CI = 'io.modelcontextprotocol/clientInfo';
