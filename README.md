@@ -151,14 +151,24 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 ## Support
 
-- GitHub issues: https://github.com/igorsaevets/page2ai-mcp/issues
-- Docs: https://igorsaevets.github.io/page2ai-docs/mcp/
+Pick the channel by what you have, not by what is quickest to type:
+
+| You have | Use |
+|---|---|
+| A bug, a page that extracts badly, a feature idea | [GitHub issues](https://github.com/igorsaevets/page2ai-mcp/issues) — public and searchable, so the fix helps the next person too |
+| A security vulnerability | [Private vulnerability reporting](https://github.com/igorsaevets/page2ai-mcp/security/advisories/new), see [SECURITY.md](SECURITY.md). Do not open a public issue |
+| A usage question | [Docs](https://igorsaevets.github.io/page2ai-docs/mcp/) first, then an issue |
 
 ## About the author
 
-Written and maintained by **Igor Saevets** — AI expert and founder of Page2AI. Full bio and social links: [igorsaevets.github.io/page2ai-docs/about/](https://igorsaevets.github.io/page2ai-docs/about/).
+Written and maintained by **Igor Saevets** — AI expert and founder of Page2AI. Full bio:
+[igorsaevets.github.io/page2ai-docs/about/](https://igorsaevets.github.io/page2ai-docs/about/).
+
+These are identity and collaboration links, not the support queue. A bug reported in a DM is a bug
+nobody else can find later, so anything you want fixed belongs in the table above.
 
 - LinkedIn: [linkedin.com/in/igorsaevets](https://www.linkedin.com/in/igorsaevets/)
+- Facebook: [facebook.com/igorsaevets](https://www.facebook.com/igorsaevets/)
 - GitHub: [github.com/igorsaevets](https://github.com/igorsaevets)
 - ORCID: [0009-0006-8636-1377](https://orcid.org/0009-0006-8636-1377)
 - Email: igorsaevets@gmail.com
