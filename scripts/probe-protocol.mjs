@@ -10,15 +10,18 @@
 //   ARM 3  initialize      — the 2025-11-25 handshake, proving the legacy era still serves
 import { spawn } from 'node:child_process';
 
-const argv = process.argv.slice(2);
+// --assert must be stripped before the command is read, or it becomes the command.
+const ASSERT = process.argv.includes('--assert');
+const argv = process.argv.slice(2).filter((a) => a !== '--assert');
 const [cmd, ...args] = argv;
 
 if (!cmd) {
   console.error(
-    'usage: node scripts/probe-protocol.mjs <command> [args...]\n\n' +
+    'usage: node scripts/probe-protocol.mjs [--assert] <command> [args...]\n\n' +
       'examples:\n' +
       '  node scripts/probe-protocol.mjs node dist/index.js\n' +
-      '  node scripts/probe-protocol.mjs npx -y page2ai-mcp@0.1.2   # control arm: the previous release\n',
+      '  node scripts/probe-protocol.mjs --assert node dist/index.js   # exit 1 unless both eras answer\n' +
+      '  node scripts/probe-protocol.mjs npx -y page2ai-mcp@0.1.2      # control arm: the previous release\n',
   );
   process.exit(2);
 }
@@ -135,3 +138,24 @@ const a = await ask(modern, 'ARM 1  server/discover WITH 2026-07-28 claim');
 const b = await ask(claimless, 'ARM 2  server/discover, claim-less');
 const c = await ask(legacy, 'ARM 3  initialize (2025-11-25)');
 console.log(`\nSUMMARY  modern=${a}  claimless=${b}  legacy=${c}`);
+
+// Without --assert this script is a printer, not a check. Measured 2026-08-01: it
+// exited 0 for a command that does not exist and for a program that is not an MCP
+// server at all. A CI step built on that reports success for a server that never
+// started, which is worse than having no step -- it turns "untested" into a green
+// mark. Control arm for the flag: `node scripts/probe-protocol.mjs --assert node
+// ./no-such-file.js` must exit 1.
+//
+// ARM 2 is deliberately NOT asserted: a claim-less `server/discover` is specified
+// as a 2025-era opening, so -32601 there is the correct answer and asserting OK
+// would fail a compliant server.
+if (ASSERT) {
+  const failures = [];
+  if (a !== 'OK') failures.push(`modern server/discover: ${a}`);
+  if (c !== 'OK') failures.push(`legacy initialize: ${c}`);
+  if (failures.length) {
+    console.error(`\nFAIL: ${failures.join(' | ')}`);
+    process.exit(1);
+  }
+  console.log('ASSERT OK: both protocol eras answered');
+}

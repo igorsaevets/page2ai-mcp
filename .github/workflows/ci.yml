@@ -1,0 +1,64 @@
+name: CI
+
+# Until now the only workflow here was the tag-triggered publish, so nothing ever
+# checked a commit on main or a pull request. Two consequences, both real: a broken
+# main was only discovered at release time, and every directory that reads a repo's
+# check status reported "CI status not available" for this project.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      # package.json declares engines.node ">=20", so 20 is a claim this repo makes
+      # to every consumer. Testing only on the newest runtime would leave that claim
+      # unverified; 24 is what publish.yml actually builds with.
+      matrix:
+        node: [20, 22, 24]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke-test the built server over stdio
+        # `npm run build` only proves it compiles. This proves the artifact starts
+        # and answers BOTH protocol eras -- what an indexer or a client does first,
+        # and the part a type-check cannot cover.
+        #
+        # --assert is not optional here. Without it the probe prints its findings
+        # and exits 0 even when the server does not exist, which would make this
+        # step a green mark that proves nothing.
+        run: node scripts/probe-protocol.mjs --assert node dist/index.js
