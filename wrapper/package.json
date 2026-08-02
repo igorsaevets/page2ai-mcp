@@ -1,6 +1,6 @@
 {
   "name": "page2ai-mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "npx wrapper for @page2ai/mcp — MCP server that converts any web page to clean Markdown. Zero external API calls, SSRF-guarded, 100% local.",
   "type": "module",
   "bin": {
@@ -16,7 +16,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@page2ai/mcp": "0.2.2"
+    "@page2ai/mcp": "0.2.3"
   },
   "publishConfig": {
     "access": "public"
