@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.2.2 - 2026-08-02
+
+### Fixed
+- Requires `@page2ai/core` 0.1.4, which closes three holes an external review panel found in the
+  0.1.2 content-root fix. None was found by testing; all three were predicted from the diff and
+  then reproduced. The worst: pages with no `<main>` at all still hit the original bug, so a card
+  grid inside `<div class="sl-main">` returned 32 characters for the whole page. Also: a page
+  whose content is a form lost its article to an unrelated sidebar card, and a real post under a
+  large related-posts rail was demoted in favour of the rail.
+
 ## 0.2.1 - 2026-08-02
 
 ### Fixed
