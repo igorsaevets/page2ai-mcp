@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.2.1 - 2026-08-02
+
+### Fixed
+- Pages built with a card grid lost almost all of their content. `@page2ai/core` chose the
+  conversion root with the FIRST `<article>` in document order, and HTML5 allows that tag on any
+  self-contained component, so a decorative card outranked the page. `docs.astro.build` returned
+  208 characters of body where it now returns 3,494; `blog.cloudflare.com` returned 927 where it
+  now returns 15,068. An `<article>` is now used only when it carries at least half its
+  container's content text. Requires `@page2ai/core` 0.1.2.
+- The server reported the wrong version over the wire. `SERVER_VERSION` was a hardcoded constant
+  beside `package.json` and `manifest.json`, and it drifted on the first release after it was
+  written. It is now read from `package.json`, with a fallback so a missing file can never stop
+  the server from starting.
+
 ## [0.2.0] - 2026-07-29
 
 Adopts MCP protocol revision **2026-07-28**, published 2026-07-28, one day after the

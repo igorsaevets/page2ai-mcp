@@ -11,12 +11,32 @@
 // that probe with `server/discover` get the 2026-07-28 era. Wiring a `Server`
 // straight to a `StdioServerTransport` — as this file did through v0.1.2 —
 // serves only the 2025 era no matter which SDK version is installed.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { Server } from '@modelcontextprotocol/server';
 import { handlePageToMarkdown, pageToMarkdownDefinition } from './tools/page-to-markdown.js';
 
 const SERVER_NAME = 'page2ai-mcp';
-const SERVER_VERSION = '0.2.0';
+
+// Read the version from package.json instead of restating it here.
+//
+// This used to be `const SERVER_VERSION = '0.2.0'`, a third source of truth beside
+// package.json and manifest.json, kept in sync by remembering to. It drifted on the very next
+// release: 0.2.1 shipped while the running server still introduced itself over the wire as
+// 0.2.0, so a client asking what it was talking to got the wrong answer and nothing failed.
+//
+// Wrapped because a version string is not worth crashing a server over: if the layout ever
+// changes and the file is not where dist/index.js expects it, an unknown version is a far
+// better outcome than a server that will not start.
+const SERVER_VERSION = ((): string => {
+  try {
+    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version || '0.0.0-unknown';
+  } catch {
+    return '0.0.0-unknown';
+  }
+})();
 
 // Log to stderr — stdio transport uses stdout for JSON-RPC frames, so anything
 // written to stderr is safe (Claude Desktop logs it to the debug console).

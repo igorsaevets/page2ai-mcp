@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "page2ai-mcp",
   "display_name": "Page2AI — Web to Markdown",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Convert any web page or HTML string to clean Markdown for LLM context",
   "long_description": "Page2AI MCP converts web pages to Markdown optimized for AI context windows. Extracts main content using DOM-position-aware dedup, preserves code blocks with language hints, converts tables and lists, and strips navigation, ads, and cookie banners. Works offline against local HTML strings or online against URLs. Zero external API calls in v0.1 — pure Node + linkedom.\n\nCompanion to the Page2AI Chrome extension. Shares the same extraction core (@page2ai/core) with the browser extension available at https://github.com/igorsaevets/page2ai-extension.",
   "author": {
