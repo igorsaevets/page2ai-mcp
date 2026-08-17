@@ -1,0 +1,29 @@
+name: Bug report
+description: page_to_markdown fails or returns bad output
+labels: [bug]
+body:
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: Claude Desktop / Claude Code / other, with version
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Server version and install method
+      placeholder: "@page2ai/mcp 0.2.3 via npx page2ai-mcp"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL that failed (if extraction-related)
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Error text, or the wrong output. Extraction QUALITY issues (page extracts but badly) belong to page2ai-core; file them there.
+    validations:
+      required: true
