@@ -36,6 +36,14 @@ In scope, and treated as a vulnerability:
 - Reading anything on the filesystem, or writing outside stdout.
 - Anything that turns a converted page into code the host process executes.
 
+Guard status (honest, as of `@page2ai/core` 0.1.6, 2026-08-17): the URL string, the hostname's
+resolved DNS addresses, and every redirect hop are validated before the request is made, and
+redirects are followed manually with a 10-hop cap. One window remains open by design: `fetch()`
+re-resolves the hostname itself, so a DNS record that flips between the guard's lookup and the
+connect (fast-flux rebinding) can still land on an internal address. Closing it requires pinning
+the connection to the vetted IP, which needs an extra runtime dependency; until that lands, a
+reliable rebinding reproduction is still a valid report, not a known-limitation dismissal.
+
 ## Extraction is not sanitization
 
 🔴 **The Markdown this server returns is untrusted input, exactly as untrusted as the page it came
