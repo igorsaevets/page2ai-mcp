@@ -69,6 +69,19 @@ jobs:
           fi
           echo "publishing $PKG"
 
+      - name: Verify server.json matches package.json
+        # The npm version and the MCP Registry entry are fed from different
+        # files; they drifted for a month (npm 0.2.4, server.json 0.2.0,
+        # registry 0.1.1) with nothing to notice. This makes the drift fatal.
+        run: |
+          SJ="$(node -p "require('./server.json').version")"
+          SP="$(node -p "require('./server.json').packages[0].version")"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$SJ" != "$PKG" ] || [ "$SP" != "$PKG" ]; then
+            echo "::error::server.json ($SJ, packages[0]=$SP) != package.json ($PKG)"
+            exit 1
+          fi
+
       - name: Check whether the scoped version is already on the registry
         id: scoped
         run: |
@@ -121,3 +134,34 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # npm publishing alone never updates the MCP Registry — it ingests
+      # server.json only through mcp-publisher, which is why the registry sat
+      # at 0.1.1 while npm moved to 0.2.4. Auth is GitHub OIDC (the job's
+      # id-token: write again), which proves the io.github.igorsaevets/*
+      # namespace from inside this repo without any stored secret.
+      - name: Check whether this version is already in the MCP Registry
+        id: registry
+        run: |
+          V="$(node -p "require('./server.json').version")"
+          LIVE="$(curl -sf "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.igorsaevets/page2ai-mcp" \
+            | jq -r '[.servers[]? | (.server // .) | select(.name == "io.github.igorsaevets/page2ai-mcp") | .version] | join(" ")' \
+            || echo "")"
+          echo "registry has: ${LIVE:-nothing}; server.json is $V"
+          case " $LIVE " in
+            *" $V "*) echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+            *)        echo "publish=true"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Install mcp-publisher
+        if: steps.registry.outputs.publish == 'true'
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        if: steps.registry.outputs.publish == 'true'
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json to MCP Registry
+        if: steps.registry.outputs.publish == 'true'
+        run: ./mcp-publisher publish
