@@ -121,6 +121,15 @@ jobs:
             echo "::error::wrapper/package.json is $WANT but package.json is $MAIN; they must match"
             exit 1
           fi
+          # The version fields matched on every release while the wrapper's
+          # DEPENDENCY lagged one version behind (0.2.3 served 0.2.2, 0.2.4
+          # served 0.2.3), so `npx page2ai-mcp` always ran the previous
+          # server. Enforce the caret-on-current convention explicitly.
+          DEP="$(node -p "require('./wrapper/package.json').dependencies['@page2ai/mcp']")"
+          if [ "$DEP" != "^$MAIN" ]; then
+            echo "::error::wrapper depends on @page2ai/mcp '$DEP'; expected '^$MAIN'"
+            exit 1
+          fi
           if npm view "page2ai-mcp@$WANT" version >/dev/null 2>&1; then
             echo "page2ai-mcp@$WANT is already published; skipping"
             echo "publish=false" >> "$GITHUB_OUTPUT"

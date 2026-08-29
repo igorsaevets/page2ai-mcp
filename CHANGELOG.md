@@ -5,6 +5,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.2.5 - 2026-08-29
+
+### Fixed
+- **The npx wrapper always ran the previous release.** `page2ai-mcp`'s dependency on
+  `@page2ai/mcp` was exact-pinned during each release to the version published *before* it —
+  wrapper 0.2.3 served 0.2.2, wrapper 0.2.4 served 0.2.3 — so `npx -y page2ai-mcp` reported
+  and ran one version behind `npx -y @page2ai/mcp`. The pin is now a caret range, and the
+  publish workflow fails when the wrapper's dependency is not `^<release version>`. Practical
+  impact was small (0.2.3's own `@page2ai/core: ^0.1.4` resolved to 0.1.7 on fresh installs),
+  but `serverInfo.version` over the wire was wrong for every wrapper user.
+
+### Changed
+- Releases now push `server.json` to the **MCP Registry** via `mcp-publisher` (GitHub OIDC),
+  with a guard that `server.json` matches `package.json`. The registry had been stale at 0.1.1
+  since July while npm moved to 0.2.4; 0.2.4 was published to it manually on 2026-08-29.
+- npm descriptions (scoped and wrapper) no longer say "100% local" — the server fetches
+  exactly the URLs you pass it. Now: processing is local and SSRF-guarded; no external APIs,
+  no telemetry.
+
+## 0.2.4 - 2026-08-17 *(entry backfilled 2026-08-29)*
+
+### Changed
+- `@page2ai/core` raised to `^0.1.7`; lockfile regenerated to match.
+- Repository hygiene batch: full Contributor Covenant v2.1 (previous copy was truncated),
+  CONTRIBUTING.md, SUPPORT.md, AGENTS.md, PR template with AI disclosure, CODEOWNERS, bug
+  report form, .editorconfig, Dependabot version updates; SECURITY.md states the actual
+  SSRF-guard coverage after core 0.1.6; Code of Conduct enforcement contact routed through
+  the GitHub handle instead of a personal email.
+- CI actions checkout/setup-node 5 → 7; dev deps vitest 3.2.7 → 4.1.10, @types/node 22 → 26.
+
+## 0.2.3 - 2026-08-02 *(entry backfilled 2026-08-29)*
+
+### Fixed
+- MCPB manifest `author.url` now points at the GitHub profile — a stated requirement of the
+  Anthropic desktop-extension submission form the manifest did not meet.
+
 ## 0.2.2 - 2026-08-02
 
 ### Fixed
