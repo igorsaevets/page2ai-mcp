@@ -187,12 +187,16 @@ chrome dropped.
 
 ## Configuration
 
-None required. All extraction options use sensible defaults.
+No setup required — every argument has a sensible default. `page_to_markdown` accepts:
 
-Future versions will support options via tool arguments:
-- `include_images` (boolean, default `false`)
-- `include_frontmatter` (boolean, default `true`)
-- `profile` (string, one of `auto | docs | marketing | research | dashboard | wordpress-marketing`, default `auto`)
+| Argument | Type | Default | Effect |
+|---|---|---|---|
+| `url` | string, **required** | — | Absolute http(s) URL to convert. Private ranges, loopback and cloud metadata endpoints are blocked (SSRF guard) |
+| `include_images` | boolean | `true` | Keep `![alt](src)` image references in the output |
+| `include_frontmatter` | boolean | `true` | Prepend the YAML front matter block |
+| `timeout_ms` | integer | `15000` | Abort the fetch after N ms (1000–60000) |
+
+Planned: a `profile` argument (`auto | docs | marketing | research | dashboard | wordpress-marketing`).
 
 ## Privacy
 
