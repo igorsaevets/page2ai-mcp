@@ -36,7 +36,12 @@ claude mcp add page2ai -- npx -y page2ai-mcp
 
 ### Claude Desktop
 
-Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`,
+One-click bundle: download `page2ai-mcp-<version>.mcpb` from the
+[latest release](https://github.com/igorsaevets/page2ai-mcp/releases/latest), then in
+Claude Desktop open **Settings → Extensions → Advanced settings → Install Extension…**
+and pick the file.
+
+Or add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`,
 Windows: `%APPDATA%\Claude\`), then fully quit and restart Claude Desktop:
 
 ```json
@@ -92,6 +97,12 @@ codex mcp add page2ai -- npx -y page2ai-mcp
 gemini mcp add page2ai npx -y page2ai-mcp
 ```
 
+### Antigravity
+
+```bash
+agy mcp add page2ai npx -y page2ai-mcp
+```
+
 ### Windsurf
 
 Add to `~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or
@@ -122,6 +133,12 @@ Add to `settings.json` (`zed: open settings file`):
 Any client that speaks MCP over stdio works — Cline, Continue, JetBrains AI Assistant,
 LM Studio and others. Point their MCP server settings at the same command:
 `npx -y page2ai-mcp`.
+
+### Letting an AI agent install it
+
+If an AI agent (Cline, Claude Code, Codex, …) is doing the setup for you, point it at
+[`llms-install.md`](./llms-install.md) — a machine-oriented install guide with the exact
+command per client and a verification step.
 
 ## Tools
 
