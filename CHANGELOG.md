@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## Unreleased
+
+### Changed
+- README restyled after a 10-reviewer documentation audit (2026-08-29): badges, quick start
+  first, per-client install blocks for Claude Code / Claude Desktop / Cursor (deeplink) /
+  VS Code / Codex CLI / Gemini CLI / Windsurf / Zed, and a verbatim output sample. Two
+  long-standing README bugs fixed: the Windsurf config path (now
+  `~/.codeium/windsurf/mcp_config.json`) and the Zed `context_servers` schema (flat
+  `command`/`args`, the nested `command.path` form is legacy). Node.js 20+ requirement now
+  stated up front. The "Zero external API calls" phrasing replaced with the accurate "the
+  only network requests are to the URLs you pass it".
+- MCPB `manifest.json` refreshed: version synced to 0.2.5, node runtime `>=20`, description
+  overclaim fixed.
+- Personal email removed from README, `manifest.json` and `package.json` author metadata —
+  same one-policy cleanup as the 0.2.4 Code of Conduct change; contact routes through the
+  GitHub handle.
+
 ## 0.2.5 - 2026-08-29
 
 ### Fixed

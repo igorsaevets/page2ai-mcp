@@ -1,78 +1,127 @@
 # @page2ai/mcp — Web to Markdown for LLM Context
 
+[![npm version](https://img.shields.io/npm/v/%40page2ai%2Fmcp)](https://www.npmjs.com/package/@page2ai/mcp)
+[![CI](https://github.com/igorsaevets/page2ai-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/igorsaevets/page2ai-mcp/actions/workflows/ci.yml)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.igorsaevets%2Fpage2ai--mcp-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.igorsaevets/page2ai-mcp)
+[![license MIT](https://img.shields.io/npm/l/%40page2ai%2Fmcp)](./LICENSE)
+
+<sub>No downloads badge on purpose: npm download counts are dominated by registry mirrors and
+bots, and this README only shows numbers a human can trust.</sub>
+
 Turn any web page into clean Markdown for Claude, ChatGPT, or your own LLM.
 
-Companion to the [Page2AI Chrome extension](https://github.com/igorsaevets/page2ai-extension). Shares the same `@page2ai/core` extraction library. Zero external API calls — runs entirely on your machine using [linkedom](https://github.com/WebReflection/linkedom).
+Fetch, extract, convert — one tool, one command, entirely on your machine. No API key,
+no account, no telemetry; the only network requests are to the URLs you pass it.
+Companion to the [Page2AI Chrome extension](https://github.com/igorsaevets/page2ai-extension);
+both share the same [`@page2ai/core`](https://npmjs.com/package/@page2ai/core) extraction library.
 
-## Install
+## Quick start
+
+```bash
+npx -y page2ai-mcp
+```
+
+This starts the stdio MCP server — it waits silently for a client, so wire it into one of
+the clients below rather than running it bare. Requires **Node.js 20+**. No API key. If
+`npx` ever serves you a stale cached version, run `npx -y page2ai-mcp@latest` once.
+
+`page2ai-mcp` is a thin unscoped wrapper around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp);
+since 0.2.5 it follows the latest server automatically via a `^` range.
+
+### Claude Code
+
+```bash
+claude mcp add page2ai -- npx -y page2ai-mcp
+```
 
 ### Claude Desktop
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%/Claude/claude_desktop_config.json` (Windows):
+Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`,
+Windows: `%APPDATA%\Claude\`), then fully quit and restart Claude Desktop:
 
 ```json
 {
   "mcpServers": {
-    "page2ai": {
-      "command": "npx",
-      "args": ["-y", "@page2ai/mcp"]
-    }
+    "page2ai": { "command": "npx", "args": ["-y", "page2ai-mcp"] }
   }
 }
 ```
 
-Restart Claude Desktop.
-
 ### Cursor
 
-Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=page2ai&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBhZ2UyYWktbWNwIl19)
+
+<!-- config = base64 of {"command":"npx","args":["-y","page2ai-mcp"]}
+     regenerate: echo -n '{"command":"npx","args":["-y","page2ai-mcp"]}' | base64 -w0 -->
+
+Or add to `~/.cursor/mcp.json` (global) / `.cursor/mcp.json` (project):
 
 ```json
 {
   "mcpServers": {
-    "page2ai": {
-      "command": "npx",
-      "args": ["-y", "@page2ai/mcp"]
-    }
+    "page2ai": { "command": "npx", "args": ["-y", "page2ai-mcp"] }
   }
 }
+```
+
+### VS Code (GitHub Copilot)
+
+```bash
+code --add-mcp '{"name":"page2ai","command":"npx","args":["-y","page2ai-mcp"]}'
+```
+
+Or add to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "page2ai": { "type": "stdio", "command": "npx", "args": ["-y", "page2ai-mcp"] }
+  }
+}
+```
+
+### Codex CLI
+
+```bash
+codex mcp add page2ai -- npx -y page2ai-mcp
+```
+
+### Gemini CLI
+
+```bash
+gemini mcp add page2ai npx -y page2ai-mcp
 ```
 
 ### Windsurf
 
-Add to `~/.windsurf/mcp.json`:
+Add to `~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or
+`%USERPROFILE%\.codeium\windsurf\mcp_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
-    "page2ai": {
-      "command": "npx",
-      "args": ["-y", "@page2ai/mcp"]
-    }
+    "page2ai": { "command": "npx", "args": ["-y", "page2ai-mcp"] }
   }
 }
 ```
 
 ### Zed
 
-Add to `settings.json`:
+Add to `settings.json` (`zed: open settings file`):
 
 ```json
 {
   "context_servers": {
-    "page2ai": {
-      "command": {
-        "path": "npx",
-        "args": ["-y", "@page2ai/mcp"]
-      }
-    }
+    "page2ai": { "command": "npx", "args": ["-y", "page2ai-mcp"] }
   }
 }
 ```
 
-### VS Code (with Continue or GitHub Copilot Chat)
+### Other MCP clients
 
-Refer to your MCP-compatible extension's documentation. The command is `npx -y @page2ai/mcp`.
+Any client that speaks MCP over stdio works — Cline, Continue, JetBrains AI Assistant,
+LM Studio and others. Point their MCP server settings at the same command:
+`npx -y page2ai-mcp`.
 
 ## Tools
 
@@ -91,9 +140,37 @@ Refer to your MCP-compatible extension's documentation. The command is `npx -y @
 **3. Compare two documentation pages:**
 > "Fetch both https://docs.anthropic.com/en/docs/prompt-engineering and https://platform.openai.com/docs/guides/prompt-engineering with page_to_markdown, then summarize the differences in approach."
 
+## What a call returns
+
+Verbatim output of `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")`,
+captured 2026-08-29 on core 0.1.7, truncated:
+
+```markdown
+---
+title: "Messages"
+source: "https://platform.claude.com/docs/en/api/messages"
+captured_at: "2026-08-29T09:01:05.806Z"
+extractor: "page2ai-core"
+extractor_version: "0.1.7"
+extractor_source: "content-negotiation"
+---
+# Messages
+
+## Create a Message
+
+**POST** `/v1/messages`
+
+Send a structured list of input messages with text and/or image content, and the
+model will generate the next message in the conversation.
+```
+
+YAML front matter (title, source, capture timestamp, extractor provenance), then the
+article as clean Markdown — headings, tables and fenced code preserved, navigation and
+chrome dropped.
+
 ## Configuration
 
-None required in v0.1. All extraction options use sensible defaults.
+None required. All extraction options use sensible defaults.
 
 Future versions will support options via tool arguments:
 - `include_images` (boolean, default `false`)
@@ -102,7 +179,10 @@ Future versions will support options via tool arguments:
 
 ## Privacy
 
-`@page2ai/mcp` collects no data, sends no telemetry, and makes no external network calls beyond the URLs you explicitly provide. See [PRIVACY.md](./PRIVACY.md) for details.
+`@page2ai/mcp` collects no data, sends no telemetry, and makes no external network calls
+beyond the URLs you explicitly provide. Note that your AI client (Claude, ChatGPT, …)
+still sends the extracted Markdown to its own model provider under that client's privacy
+policy — that part is outside this server's control. See [PRIVACY.md](./PRIVACY.md) for details.
 
 ## Protocol revisions
 
@@ -171,7 +251,6 @@ nobody else can find later, so anything you want fixed belongs in the table abov
 - Facebook: [facebook.com/igorsaevets](https://www.facebook.com/igorsaevets/)
 - GitHub: [github.com/igorsaevets](https://github.com/igorsaevets)
 - ORCID: [0009-0006-8636-1377](https://orcid.org/0009-0006-8636-1377)
-- Email: igorsaevets@gmail.com
 
 
 ## Build provenance
