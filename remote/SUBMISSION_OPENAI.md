@@ -81,21 +81,32 @@ Fixture data: none needed — every case uses public URLs, no accounts.
 
 ### Positive
 
-| # | User prompt | Expected tool behavior | Expected result shape |
-|---|---|---|---|
-| P1 | "Convert https://example.com/ to Markdown" | `page_to_markdown` with `url` | Markdown text, exactly one `# Example Domain` H1 |
-| P2 | "Fetch the MDN page on HTTP 429 as Markdown" (`developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429`) | fetch + convert | frontmatter `title: "429 Too Many Requests"`; body mentions `Retry-After`; headings/inline code preserved |
-| P3 | "Convert https://example.com/ and include frontmatter" | `include_frontmatter: true` | output starts with `---` YAML carrying `source:` URL and `title:` |
-| P4 | "Convert the Wikipedia Golden Gate Bridge article without images" | `include_images: false` | long Markdown (>5 000 chars) containing **zero** `![` image tags |
-| P5 | "Get the Wikipedia Small business article as Markdown" | plain call on a long page | >5 000 chars of extracted main content with H1; nav/boilerplate dropped |
+Every prompt carries the full explicit URL — a prompt like "the Wikipedia
+article on X" invites the model to answer from memory or native search instead
+of calling the tool. Test-account / fixture data: **none** for every case
+(public URLs, no auth of any kind).
+
+| # | User prompt | Expected tool behavior | Expected result shape | Fixture |
+|---|---|---|---|---|
+| P1 | "Convert https://example.com/ to Markdown" | `page_to_markdown` with `url` | Markdown text, exactly one `# Example Domain` H1 | none |
+| P2 | "Fetch https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429 as Markdown" | fetch + convert | frontmatter `title: "429 Too Many Requests"`; body mentions `Retry-After`; headings/inline code preserved | none |
+| P3 | "Convert https://example.com/ and include frontmatter" | `include_frontmatter: true` | output starts with `---` YAML carrying `source:` URL and `title:` | none |
+| P4 | "Convert https://en.wikipedia.org/wiki/Golden_Gate_Bridge to Markdown without images" | `include_images: false` | long Markdown (>5 000 chars) containing **zero** `![` image tags | none |
+| P5 | "Get https://en.wikipedia.org/wiki/Small_business as Markdown" | plain call on a long page | >5 000 chars of extracted main content with H1; nav/boilerplate dropped | none |
+
+(P2's `/Reference/` path is the CANONICAL MDN URL — measured 2026-08-30:
+it answers 200 while the old `/Web/HTTP/Status/429` form 301-redirects to it.)
 
 ### Negative
 
 | # | Scenario | Expected refusal / safe fallback | Justification for non-completion |
 |---|---|---|---|
 | N1 | URL points at cloud metadata: `http://169.254.169.254/latest/meta-data/` | tool result `isError: true`, message names the blocked-address class; **no fetch is made** | SSRF guard: a hosted fetcher must never be usable to read its own infrastructure's metadata service |
-| N2 | URL points at loopback: `http://127.0.0.1:8080/admin` | `isError: true`, blocked-address message | Same guard: private ranges and loopback are refused before any connection |
+| N2 | Non-HTTP scheme: `file:///etc/passwd` | `isError: true`, message names the rejected scheme (`scheme "file:" not in {http:, https:}`) | Scheme validation: only http/https are fetchable; local-file access is refused by design |
 | N3 | URL's domain does not exist: `https://no-such-host.page2ai.invalid/` | `isError: true` with a readable fetch-failure message — a tool-level error, **not** a protocol failure or 500 | DNS failure is a user-input problem; the model should see a clean explanation it can relay |
+
+(The runner additionally exercises loopback `http://127.0.0.1:8080/admin` as
+N4 — same SSRF-guard class as N1, kept verified but off the form.)
 
 ## 6. Global / Submit sections
 
@@ -131,11 +142,18 @@ If the review flow asks for one anyway, the script is:
 
 1. **Me, same day:** rerun `smoke`, `smoke:native`, `verify-submission-cases`
    against prod; all green or stop.
-2. **Me:** open `platform.openai.com/plugins` in the Playwright session, fill
-   every field from this file.
-3. **Igor:** developer-identity verification state (individual) — his account.
-4. **Me:** when the portal issues the domain token → write
-   `public/.well-known/openai-apps-challenge`, deploy, `curl` it live.
-5. **Igor:** read the policy attestations, click **Submit**.
-6. **Me:** record submission date + any receipt in `.memory/STATE.md`;
+2. **Check first:** the OpenAI Platform project must have **Global** data
+   residency — "projects with EU data residency cannot submit plugins with
+   MCP servers for review" (app-review page, verbatim, fetched 2026-08-30).
+3. **Me:** open `platform.openai.com/plugins` in the Playwright session, fill
+   the form fields from this file. **Form-filling only** — anything touching
+   identity, payment, 2FA or attestations is Igor's, by hand.
+4. **Igor, by hand:** developer-identity verification (individual; KYC-class
+   flow on his account — never automated).
+5. **Me:** when the portal issues the domain token → write it verbatim to
+   `public/.well-known/openai-apps-challenge`, add a `vercel.json` headers
+   rule for that path (`content-type: text/plain`, `cache-control: no-store`),
+   deploy, then `curl -i` the live URL and compare byte-for-byte.
+6. **Igor, by hand:** read the policy attestations, click **Submit**.
+7. **Me:** record submission date + any receipt in `.memory/STATE.md`;
    silence-clock per directory norms before any follow-up.

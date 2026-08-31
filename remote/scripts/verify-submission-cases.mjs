@@ -82,10 +82,10 @@ const cases = [
   },
   {
     id: 'N2',
-    desc: 'loopback address -> refused by SSRF guard (isError)',
+    desc: 'file:// scheme -> refused by scheme validation (isError)',
     run: async () => {
-      const r = await call({ url: 'http://127.0.0.1:8080/admin' });
-      return r.isError === true && /blocked|private|loopback|not allowed|refus/i.test(text(r));
+      const r = await call({ url: 'file:///etc/passwd' });
+      return r.isError === true && /scheme|file:|not in/i.test(text(r));
     },
   },
   {
@@ -94,6 +94,14 @@ const cases = [
     run: async () => {
       const r = await call({ url: 'https://no-such-host.page2ai.invalid/' });
       return r.isError === true && text(r).length > 0;
+    },
+  },
+  {
+    id: 'N4',
+    desc: 'loopback address -> refused by SSRF guard (runner extra, not on the form)',
+    run: async () => {
+      const r = await call({ url: 'http://127.0.0.1:8080/admin' });
+      return r.isError === true && /blocked|private|loopback|not allowed|refus/i.test(text(r));
     },
   },
 ];
@@ -112,5 +120,5 @@ for (const c of cases) {
 }
 
 await client.close();
-console.log(failures === 0 ? 'ALL 8 CASES PASS' : `${failures} CASE(S) FAILED`);
+console.log(failures === 0 ? `ALL ${cases.length} CASES PASS` : `${failures} CASE(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
