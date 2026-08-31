@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev:local": "tsx scripts/local-serve.mts",
-    "smoke": "node scripts/smoke-remote.mjs"
+    "smoke": "node scripts/smoke-remote.mjs",
+    "smoke:native": "node scripts/smoke-native.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
@@ -19,6 +20,7 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/node": "^26.2.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

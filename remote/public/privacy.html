@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — Page2AI MCP hosted endpoint</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6; color: #1a1a1a; }
+    code { background: #f2f2f2; padding: 0.15em 0.4em; border-radius: 4px; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.15rem; }
+    .note { border-left: 3px solid #b58900; padding-left: 1rem; color: #444; }
+    footer { margin-top: 2rem; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
+
+  <h2>What this service does</h2>
+  <p>
+    The endpoint exposes one Model Context Protocol tool, <code>page_to_markdown</code>.
+    When your AI client calls it, this server fetches the public web page at the URL
+    you supplied and returns it converted to Markdown. That is the entire product.
+  </p>
+
+  <h2>What is processed, server-side</h2>
+  <p>
+    Because this is a <strong>hosted</strong> service, two things necessarily pass
+    through this server's memory for the duration of a request: the URL you submit,
+    and the content of the page fetched from it. Processing is transient — the
+    request is answered and the data is gone from the application.
+  </p>
+  <p class="note">
+    Do not submit URLs that embed credentials, session tokens, API keys, or signed
+    parameters (e.g. pre-signed download links). A URL sent to a hosted service is
+    disclosed to that service and appears in infrastructure logs. If your URLs are
+    sensitive, run the identical server locally instead: <code>npx -y page2ai-mcp</code>.
+  </p>
+
+  <h2>What we store</h2>
+  <p>
+    <strong>Nothing, by the application.</strong> No accounts, no databases, no
+    fetched-page storage, no advertising or cross-site tracking, no analytics
+    cookies. Retention by the application is zero.
+  </p>
+
+  <h2>Infrastructure logs (subprocessor)</h2>
+  <p>
+    Hosting is provided by <strong>Vercel Inc.</strong> (USA). Vercel keeps its
+    standard operational logs — which include the caller's IP address, user agent,
+    request path and timing — under
+    <a href="https://vercel.com/legal/privacy-policy">Vercel's privacy policy</a>
+    and retention defaults. We do not enrich, export, or sell these logs; we read
+    them only for abuse handling and debugging.
+  </p>
+  <p>
+    If you reach this endpoint through a third-party directory or gateway that
+    proxies MCP traffic (rather than connecting to this hostname directly), that
+    intermediary is an additional, independent processor of your requests — check
+    its policy too.
+  </p>
+
+  <h2>Your alternatives</h2>
+  <p>
+    The same tool ships as a local server (<code>npx -y page2ai-mcp</code>, MIT
+    licensed, <a href="https://github.com/igorsaevets/page2ai-mcp">source</a>) and
+    as a browser extension. Both run entirely on your machine with zero egress to
+    this service.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Questions: <a href="https://github.com/igorsaevets/page2ai-mcp/issues">GitHub issues</a>.
+    Security reports: <a href="https://github.com/igorsaevets/page2ai-mcp/security">GitHub
+    private vulnerability reporting</a>.
+  </p>
+
+  <footer>
+    <a href="/">Home</a> · <a href="/terms.html">Terms</a> · <a href="/support.html">Support</a> ·
+    <a href="https://igorsaevets.github.io/page2ai-docs/">Docs</a> · © Igor Saevets
+  </footer>
+</body>
+</html>
