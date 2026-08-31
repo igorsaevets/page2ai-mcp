@@ -54,11 +54,11 @@ const cases = [
   },
   {
     id: 'P4',
-    desc: 'include_images=false -> no image markdown in an image-heavy article',
+    desc: 'include_images=false -> no image markdown on a page with real images',
     run: async () => {
-      // Not the /wiki/Markdown article: it QUOTES image syntax as page text,
-      // which correctly survives (only real <img> elements are stripped).
-      const r = await call({ url: 'https://en.wikipedia.org/wiki/Golden_Gate_Bridge', include_images: false });
+      // MDN Overview carries 5 real diagrams and stays ~21KB — small enough
+      // that a reviewer's client comfortably holds the tool response.
+      const r = await call({ url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview', include_images: false });
       const md = text(r);
       return !r.isError && md.length > 5000 && !md.includes('![');
     },
@@ -67,7 +67,9 @@ const cases = [
     id: 'P5',
     desc: 'long-form article -> main content extracted, boilerplate dropped',
     run: async () => {
-      const r = await call({ url: 'https://en.wikipedia.org/wiki/Small_business' });
+      // ~51KB of markdown: long enough to prove extraction, half the size of
+      // the first candidate (93KB) so it cannot stress client response caps.
+      const r = await call({ url: 'https://en.wikipedia.org/wiki/Markdown' });
       const md = text(r);
       return !r.isError && md.length > 5000 && /^# /m.test(md);
     },

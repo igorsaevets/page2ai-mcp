@@ -91,8 +91,12 @@ of calling the tool. Test-account / fixture data: **none** for every case
 | P1 | "Convert https://example.com/ to Markdown" | `page_to_markdown` with `url` | Markdown text, exactly one `# Example Domain` H1 | none |
 | P2 | "Fetch https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429 as Markdown" | fetch + convert | frontmatter `title: "429 Too Many Requests"`; body mentions `Retry-After`; headings/inline code preserved | none |
 | P3 | "Convert https://example.com/ and include frontmatter" | `include_frontmatter: true` | output starts with `---` YAML carrying `source:` URL and `title:` | none |
-| P4 | "Convert https://en.wikipedia.org/wiki/Golden_Gate_Bridge to Markdown without images" | `include_images: false` | long Markdown (>5 000 chars) containing **zero** `![` image tags | none |
-| P5 | "Get https://en.wikipedia.org/wiki/Small_business as Markdown" | plain call on a long page | >5 000 chars of extracted main content with H1; nav/boilerplate dropped | none |
+| P4 | "Convert https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview to Markdown without images" | `include_images: false` | ~21 KB Markdown with **zero** `![` tags (same page WITH images carries 5 real diagrams — a true differential) | none |
+| P5 | "Get https://en.wikipedia.org/wiki/Markdown as Markdown" | plain call on a long page | >5 000 chars (~51 KB) of extracted main content with H1; nav/boilerplate dropped | none |
+
+Page sizes are chosen deliberately: the earlier P4/P5 candidates produced 211 KB
+and 94 KB tool responses — big enough to stress a reviewing client's tool-result
+limits through no fault of the server. Current picks: ~21 KB and ~51 KB.
 
 (P2's `/Reference/` path is the CANONICAL MDN URL — measured 2026-08-30:
 it answers 200 while the old `/Web/HTTP/Status/429` form 301-redirects to it.)
