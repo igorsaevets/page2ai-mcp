@@ -8,11 +8,12 @@
 <sub>No downloads badge on purpose: npm download counts are dominated by registry mirrors and
 bots, and this README only shows numbers a human can trust.</sub>
 
-Turn any web page into clean Markdown for Claude, ChatGPT, or your own LLM.
+> One-click webpage-to-Markdown MCP server for ChatGPT, Claude, and Gemini.
+> Preserves code blocks with language hints, tables, and reading structure.
+> Fetch, extract, convert — one tool, one command, entirely on your machine.
+> No API key, no account, no telemetry; the only network requests are to the URLs you pass it.
 
-Fetch, extract, convert — one tool, one command, entirely on your machine. No API key,
-no account, no telemetry; the only network requests are to the URLs you pass it.
-Companion to the [Page2AI Chrome extension](https://github.com/igorsaevets/page2ai-extension);
+Companion to the [Page2AI Chrome & Firefox extensions](https://github.com/igorsaevets/page2ai-extension);
 both share the same [`@page2ai/core`](https://npmjs.com/package/@page2ai/core) extraction library.
 
 ## Quick start
