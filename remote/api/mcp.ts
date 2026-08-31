@@ -67,6 +67,8 @@ const CORS_HEADERS = {
   'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
   'access-control-allow-headers': 'content-type, accept, mcp-session-id, mcp-protocol-version, authorization',
   'access-control-expose-headers': 'mcp-session-id, mcp-protocol-version',
+  // Tool results are conversions of live pages; a cached reply is a stale page.
+  'cache-control': 'no-store',
 };
 
 function handleOptions(): Response {

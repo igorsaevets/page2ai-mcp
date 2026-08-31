@@ -43,7 +43,10 @@ Production endpoint: **https://page2ai-mcp-remote.vercel.app/api/mcp**
 ## Deploy
 
 Deployed as a separate Vercel project (`page2ai-mcp-remote`) with root
-directory `remote/`. `vercel.json` sets `maxDuration: 90` (the tool accepts
-`timeout_ms` up to 60 s). Abuse posture: per-IP and per-instance rate limits in
-code, private-range/metadata fetches blocked by the core SSRF guard, 10 MB
-response cap.
+directory `remote/`. `vercel.json` sets `maxDuration: 30` — the hosted variant
+deliberately caps wall-clock below the tool's `timeout_ms` maximum (60 s), so
+requests asking for >25 s fetches may be cut by the platform; the default 15 s
+is unaffected. Abuse posture: platform WAF rate-limit rule (60 req/60 s per IP
+→ deny on `/api/mcp`) + per-IP and per-instance limits in code (x-real-ip
+keyed), private-range/metadata fetches blocked by the core SSRF guard, 10 MB
+response cap, `cache-control: no-store` on API responses.
