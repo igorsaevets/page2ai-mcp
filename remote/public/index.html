@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Page2AI MCP — hosted endpoint</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6; color: #1a1a1a; }
+    code { background: #f2f2f2; padding: 0.15em 0.4em; border-radius: 4px; }
+    h1 { font-size: 1.5rem; }
+    .note { border-left: 3px solid #b58900; padding-left: 1rem; color: #444; }
+  </style>
+</head>
+<body>
+  <h1>Page2AI MCP — hosted endpoint</h1>
+  <p>
+    This is the hosted (Streamable HTTP) variant of the
+    <a href="https://github.com/igorsaevets/page2ai-mcp">Page2AI MCP server</a>:
+    one tool, <code>page_to_markdown</code>, which fetches a public web page and
+    converts it to clean Markdown for LLM context.
+  </p>
+  <p>MCP endpoint: <code>POST /api/mcp</code> (Model Context Protocol, Streamable HTTP transport).</p>
+  <h2>Privacy</h2>
+  <p class="note">
+    Requests to this hosted endpoint transit this server: the URL you ask it to
+    convert is fetched from here. No accounts, no tracking cookies; operational
+    logs are Vercel platform defaults. If you want zero egress to any third
+    party, run the same server locally instead — <code>npx -y page2ai-mcp</code> —
+    it is the same code and stays entirely on your machine.
+  </p>
+  <p>
+    Rate limits apply (per-IP). The fetcher blocks private network ranges,
+    loopback and cloud metadata endpoints, caps responses at 10&nbsp;MB and
+    enforces timeouts.
+  </p>
+  <p>
+    <a href="https://github.com/igorsaevets/page2ai-mcp">GitHub</a> ·
+    <a href="https://igorsaevets.github.io/page2ai-docs/">Docs</a> ·
+    MIT license · © Igor Saevets
+  </p>
+</body>
+</html>
