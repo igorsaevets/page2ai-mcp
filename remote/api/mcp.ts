@@ -44,6 +44,23 @@ function limited(ip: string): boolean {
   return entry.count > MAX_PER_IP;
 }
 
+// mcp-handler v2 declares serverInfo as `{ name; version }` only, but the underlying
+// @modelcontextprotocol/server v2 Implementation schema also accepts title, description,
+// websiteUrl, and icons. Passing them through populates the `initialize` response that
+// directories (LobeHub, Cursor Directory, MCP Registry, mcp.pub) read verbatim to render
+// server cards. The assignment goes through a variable so TS excess-property check is
+// evaluated at the wider inferred type, and the cast then narrows to the declared shape.
+const serverInfoWithMetadata = {
+  name: 'page2ai-mcp-remote',
+  version: '0.1.0',
+  title: 'Page2AI (hosted)',
+  description:
+    'Convert any webpage or HTML to clean Markdown for ChatGPT, Claude, and Gemini ' +
+    'context. Preserves code blocks with language hints, tables, and reading structure. ' +
+    'Zero telemetry, MIT-licensed. Hosted variant of @page2ai/mcp.',
+  websiteUrl: 'https://page2ai-mcp-remote.vercel.app',
+};
+
 const mcp = createMcpHandler(
   (server) => {
     server.registerTool(
@@ -58,7 +75,7 @@ const mcp = createMcpHandler(
     );
   },
   {
-    serverInfo: { name: 'page2ai-mcp-remote', version: '0.1.0' },
+    serverInfo: serverInfoWithMetadata as { name: string; version: string },
     // Tools-only server: no resources, so no subscription streams to serve.
     maxSubscriptions: 0,
   },
