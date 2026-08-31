@@ -1,0 +1,13 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/mcp.json",
+  "mcpServers": {
+    "page2ai": {
+      "command": "npx",
+      "args": ["-y", "@page2ai/mcp"]
+    },
+    "page2ai-remote": {
+      "url": "https://page2ai-mcp-remote.vercel.app/api/mcp",
+      "type": "streamable-http"
+    }
+  }
+}
