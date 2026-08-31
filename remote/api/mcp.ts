@@ -59,6 +59,8 @@ const mcp = createMcpHandler(
   },
   {
     serverInfo: { name: 'page2ai-mcp-remote', version: '0.1.0' },
+    // Tools-only server: no resources, so no subscription streams to serve.
+    maxSubscriptions: 0,
   },
 );
 
@@ -75,9 +77,33 @@ function handleOptions(): Response {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
+// The MCP Streamable HTTP spec (2025-11-25 and 2026-07-28 alike) requires
+// servers to validate Origin. Non-browser clients send none — allowed; any
+// https origin is fine for a public endpoint; http/file/null origins are the
+// DNS-rebinding shapes the rule exists to reject.
+function originAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  try {
+    return new URL(origin).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 async function withLimit(req: Request): Promise<Response> {
+  if (!originAllowed(req.headers.get('origin'))) {
+    return new Response(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        error: { code: -32003, message: 'Forbidden origin.' },
+        id: null,
+      }),
+      { status: 403, headers: { 'content-type': 'application/json', ...CORS_HEADERS } },
+    );
+  }
   // x-real-ip is set by Vercel from the TCP connection and is not client-
   // spoofable; x-forwarded-for's leftmost entry is the documented fallback.
+  // If a proxy ever fronts this deployment, switch to x-vercel-forwarded-for.
   const ip =
     req.headers.get('x-real-ip')?.trim() ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
