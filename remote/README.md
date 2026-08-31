@@ -21,10 +21,18 @@ author (on Vercel). The local variant never does that.
 
 - `api/mcp.ts` — the Vercel function: `createMcpHandler` (mcp-handler 2.x,
   stateless Streamable HTTP, no Redis) + in-code per-IP rate limiter.
-- `public/index.html` — human-readable landing + privacy note.
+- `public/index.html` — human-readable landing + privacy note; full pages at
+  `/privacy.html`, `/terms.html`, `/support.html`.
 - `scripts/local-serve.mts` — runs the exact function on `localhost:3999`.
-- `scripts/smoke-remote.mjs` — raw JSON-RPC smoke: initialize → tools/list →
-  tools/call → asserts `# Example Domain`, exactly one H1.
+- `scripts/smoke-remote.mjs` — raw JSON-RPC smoke of the LEGACY era
+  (`initialize`, negotiates 2025-11-25): tools/list → tools/call → asserts
+  `# Example Domain`, exactly one H1.
+- `scripts/smoke-native.mjs` — official SDK v2 client, MODERN era
+  (`server/discover`, negotiates 2026-07-28; the client defaults to legacy —
+  `versionNegotiation: { mode: 'auto' }` is what opts in).
+- `scripts/verify-submission-cases.mjs` — the 5 positive + 3 negative
+  directory-submission test cases, executed against a live endpoint.
+- `SUBMISSION_OPENAI.md` — the OpenAI Plugins Directory submission pack.
 
 ## Develop / verify
 
@@ -38,7 +46,7 @@ node scripts/smoke-remote.mjs https://page2ai-mcp-remote.vercel.app/api/mcp
 ```
 
 Production endpoint: **https://page2ai-mcp-remote.vercel.app/api/mcp**
-(deployed 2026-08-30; smoke passes in ~1 s).
+(deployed 2026-08-30; both era smokes pass in under 1 s each).
 
 ## Deploy
 
