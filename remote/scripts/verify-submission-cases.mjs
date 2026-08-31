@@ -40,7 +40,8 @@ const cases = [
       const r = await call({ url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429' });
       const md = text(r);
       // Frontmatter is on by default, so the page title lands in YAML `title:`.
-      return !r.isError && md.includes('title: "429 Too Many Requests"') && md.includes('Retry-After');
+      // Contains-checks, not exact-match: MDN title suffixes drift (panel 2/2).
+      return !r.isError && /title: "[^"]*429[^"]*"/.test(md) && /retry-after/i.test(md);
     },
   },
   {
@@ -69,9 +70,10 @@ const cases = [
     run: async () => {
       // ~51KB of markdown: long enough to prove extraction, half the size of
       // the first candidate (93KB) so it cannot stress client response caps.
+      // Floor 3000, not 5000: article edits can dip length (panel robustness).
       const r = await call({ url: 'https://en.wikipedia.org/wiki/Markdown' });
       const md = text(r);
-      return !r.isError && md.length > 5000 && /^# /m.test(md);
+      return !r.isError && md.length > 3000 && /^# /m.test(md);
     },
   },
   {

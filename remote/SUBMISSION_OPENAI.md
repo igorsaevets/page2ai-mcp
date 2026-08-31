@@ -1,7 +1,12 @@
 # OpenAI Plugins Directory — submission pack (MCP-only)
 
 Prepared 2026-08-30 against the live submission requirements at
-`developers.openai.com/apps-sdk/deploy/submission/` (re-fetched same day).
+`developers.openai.com/plugins/deploy/submission` (the `apps-sdk/…` paths now
+301 to `plugins/…`), hard limits cross-checked against
+`…/plugins/deploy/submission-errors` (demo URL required · ≤3 starter prompts ·
+short description ≤30 chars) and annotation semantics against
+`…/plugins/reference` — all fetched 2026-08-30, plus a 3-model review panel
+(GPT-5.4 · Muse Spark 1.2 · Gemini 3.7 Flash) whose findings are folded in.
 Strategy: **MCP-only first**; the skill bundle ships later as an update —
 skills are scanned separately at review and add surface without day-one value
 for a one-tool product.
@@ -17,25 +22,31 @@ and `scripts/smoke-native.mjs` (modern era, negotiated `2026-07-28`).
 | Field | Value |
 |---|---|
 | Plugin name | Page2AI |
-| Short description | Convert any public web page to clean, AI-ready Markdown. |
+| Developer name (listing) | Igor Saevets |
+| Short description | `Public web page to Markdown` — **27 chars; the final-submission limit is 30** (submission-errors page, verified 2026-08-30) |
 | Long description | see below |
-| Logo | `page2md-extension/assets/store/icon-128.png` (resize if the form wants 512×512) |
-| Category | Productivity (fallback: Developer Tools) |
+| Logo | from `page2md-extension/assets/store/icon-128.png`, **exported at 512×512** for the form |
+| Category | Productivity (both Productivity and Developer Tools are on the current supported list) |
 | Developer identity | Igor Saevets — **verified individual** on the OpenAI Platform (Igor completes verification if not already green) |
-| Website URL | `https://igorsaevets.github.io/page2ai-docs/` |
+| Website URL | `https://page2ai-mcp-remote.vercel.app/` — **the hosted root, NOT the docs site.** The docs site leads with local-first "no third-party" claims that contradict a hosted submission; a reviewer clicking Website must land on the page that describes THIS service (panel finding, 2/2 senior reviewers) |
 | Support URL | `https://page2ai-mcp-remote.vercel.app/support.html` |
 | Privacy policy URL | `https://page2ai-mcp-remote.vercel.app/privacy.html` |
 | Terms URL | `https://page2ai-mcp-remote.vercel.app/terms.html` |
 
-Long description (no absolute claims — "100%"-style wording has already cost a
-store rejection elsewhere):
+Long description (single-URL framing, explicit distance from
+scraper/connector/bypass readings; no absolute claims; no logged-in-pages
+sentence — it points reviewers at the unofficial-connector concern):
 
-> Page2AI converts a public web page into clean Markdown built for LLM
-> context: main content extracted, boilerplate dropped, headings, code blocks,
-> tables and links preserved, optional YAML frontmatter with source URL and
-> capture time. One read-only tool, no accounts. The same MIT-licensed engine
-> also ships as a local MCP server (`npx -y page2ai-mcp`) and a browser
-> extension for logged-in or JavaScript-heavy pages.
+> Page2AI converts a single public web page — only the URL you explicitly
+> provide — into clean Markdown for LLM context: main content extracted,
+> boilerplate dropped, headings, code blocks, tables and links preserved,
+> optional YAML frontmatter with the source URL and title. On-demand and
+> read-only: no crawling, no accounts, no data stored by the application. It
+> does not bypass paywalls, logins, rate limits or any site's access controls;
+> private-network and cloud-metadata URLs are refused; responses are capped at
+> 10 MB with enforced timeouts and per-IP rate limits. The identical
+> MIT-licensed engine is available as a local MCP server
+> (`npx -y page2ai-mcp`) for fully private workflows.
 
 ## 2. MCP section
 
@@ -60,19 +71,25 @@ Tool: `page_to_markdown` (the only tool).
 | Annotation | Value | Justification |
 |---|---|---|
 | `readOnlyHint` | `true` | The tool performs an HTTP GET of a public page and returns a transformation of it. It writes nothing anywhere: no storage, no accounts, no side effects on the fetched site beyond the read itself. |
-| `openWorldHint` | `true` | The tool reaches outside the closed tool environment — it fetches arbitrary public URLs from the internet. This is the honest value for any web fetcher. |
+| `openWorldHint` | `true` | Per the MCP specification and your Reference page, open-world declares that a tool "reaches outside the current user's account" — this tool fetches external public URLs, the spec's canonical open-world case (its example: "the world of a web search tool is open"). Note for the write-scope reading on the app-review page ("can write to or change publicly visible internet state"): under THAT definition the answer is No — the tool cannot write to or change any internet state; it is strictly read-only. |
 | `destructiveHint` | `false` | Nothing can be deleted or modified: there is no state to destroy on our side, and a GET is non-destructive on the target side. |
-| `idempotentHint` | `false` | Deliberately false: the fetched page may change between calls, so two identical calls can return different Markdown. Claiming idempotency would license caching that serves stale pages. |
+| `idempotentHint` | `false` | Optional hint, stated deliberately: the fetched page may change between calls, so two identical calls can return different Markdown. Claiming idempotency would license caching that serves stale pages. |
+
+⚠️ OpenAI's own two pages define `openWorldHint` differently (Reference:
+reaches-outside-the-account → `true`; app-review: write-scope → would be
+`false`). The value stays `true` (MCP canon + their Reference); the
+justification above answers both readings so an automated "annotations do not
+match behavior" flag has a written answer. Panel split 1/1/abstain on this;
+resolved by primary sources.
 
 VERIFIED: annotations survive the wire — `smoke:native` asserts
 `readOnlyHint === true` in the live `tools/list` response.
 
-## 4. Starter prompts
+## 4. Starter prompts — **at most 3** (submission-errors page, verified 2026-08-30)
 
 1. "Convert https://example.com/article to Markdown so I can quote it."
 2. "Fetch this docs page as Markdown and summarize the API changes: <url>"
 3. "Get me the text of <url> without images, as Markdown."
-4. "Pull <url> into context with its source URL and title as frontmatter."
 
 ## 5. Test cases — 5 positive + 3 negative, all VERIFIED live 2026-08-30
 
@@ -86,13 +103,17 @@ article on X" invites the model to answer from memory or native search instead
 of calling the tool. Test-account / fixture data: **none** for every case
 (public URLs, no auth of any kind).
 
+Prompts ask for **raw Markdown pasted verbatim** where evidence matters — a
+bare "convert X" lets ChatGPT summarize the tool result, and the reviewer then
+never sees the Markdown the case is about (senior-panel finding).
+
 | # | User prompt | Expected tool behavior | Expected result shape | Fixture |
 |---|---|---|---|---|
-| P1 | "Convert https://example.com/ to Markdown" | `page_to_markdown` with `url` | Markdown text, exactly one `# Example Domain` H1 | none |
-| P2 | "Fetch https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429 as Markdown" | fetch + convert | frontmatter `title: "429 Too Many Requests"`; body mentions `Retry-After`; headings/inline code preserved | none |
-| P3 | "Convert https://example.com/ and include frontmatter" | `include_frontmatter: true` | output starts with `---` YAML carrying `source:` URL and `title:` | none |
-| P4 | "Convert https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview to Markdown without images" | `include_images: false` | ~21 KB Markdown with **zero** `![` tags (same page WITH images carries 5 real diagrams — a true differential) | none |
-| P5 | "Get https://en.wikipedia.org/wiki/Markdown as Markdown" | plain call on a long page | >5 000 chars (~51 KB) of extracted main content with H1; nav/boilerplate dropped | none |
+| P1 | "Convert https://example.com/ to Markdown and paste the raw Markdown" | `page_to_markdown` with `url` | Markdown text, exactly one `# Example Domain` H1 | none |
+| P2 | "Fetch https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429 as Markdown and paste the first 15 lines verbatim" | fetch + convert | frontmatter `title:` containing `429`; body mentions `Retry-After` (case-insensitive); headings/inline code preserved | none |
+| P3 | "Convert https://example.com/ and include frontmatter; paste the raw output" | `include_frontmatter: true` | output starts with `---` YAML carrying `source:` URL and `title:` | none |
+| P4 | "Convert https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview to Markdown without images and paste the first 30 lines of raw Markdown" | `include_images: false` | ~21 KB Markdown with **zero** `![` tags (same page WITH images carries 5 real diagrams — a true differential) | none |
+| P5 | "Get https://en.wikipedia.org/wiki/Markdown as Markdown and quote its first two sections verbatim" | plain call on a long page | >3 000 chars (~51 KB today) of extracted main content with H1; nav/boilerplate dropped | none |
 
 Page sizes are chosen deliberately: the earlier P4/P5 candidates produced 211 KB
 and 94 KB tool responses — big enough to stress a reviewing client's tool-result
@@ -130,17 +151,23 @@ Release notes (v0.1.0 of the hosted endpoint):
 > Engine is the MIT-licensed `@page2ai/core`, identical to the local
 > `page2ai-mcp` stdio server.
 
-## 7. Demo recording
+## 7. Demo recording — **REQUIRED for MCP-backed submissions**
 
-The submission page (re-checked 2026-08-30) lists **no demo-recording field**.
-If the review flow asks for one anyway, the script is:
+The submission page itself does not mention it, but the **submission-errors
+reference does** (verified 2026-08-30, verbatim): *"A demo-recording URL that
+shows the main use cases and tools across supported platforms."* T72's "no demo
+needed" note was wrong-by-omission — the requirement lives on a different page.
+
+Script (recorded in ChatGPT on Igor's account — his hands; ~2 minutes):
 
 1. ChatGPT → Settings → Connectors → add `https://page2ai-mcp-remote.vercel.app/api/mcp`.
-2. Prompt: "Convert https://en.wikipedia.org/wiki/Small_business to Markdown
-   and quote the first paragraph."
-3. Show the tool call firing, the Markdown coming back, the model quoting it.
-4. Prompt: "Now convert http://169.254.169.254/latest/meta-data/" — show the
-   clean refusal.
+2. Prompt P1: "Convert https://example.com/ to Markdown and paste the raw
+   Markdown" — show the tool call firing and the `# Example Domain` output.
+3. Prompt P4 (no-images variant) — show the option working.
+4. Prompt N1: "Convert http://169.254.169.254/latest/meta-data/" — show the
+   clean SSRF refusal.
+5. Upload as an **unlisted YouTube video** (or any stable public URL) and put
+   that URL in the form.
 
 ## 8. Submission runbook (AI prepares, Igor clicks)
 

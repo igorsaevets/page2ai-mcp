@@ -17,6 +17,18 @@
   <h1>Privacy Policy</h1>
   <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
 
+  <h2>Who operates this</h2>
+  <p>
+    The service is operated by <strong>Igor Saevets</strong>, an individual
+    developer in the United States (the data controller for this service).
+    Contact for privacy matters:
+    <a href="https://github.com/igorsaevets/page2ai-mcp/issues">GitHub issues</a>
+    (public) or
+    <a href="https://github.com/igorsaevets/page2ai-mcp/security">GitHub private
+    vulnerability reporting</a> (confidential). Requests are processed in the
+    United States.
+  </p>
+
   <h2>What this service does</h2>
   <p>
     The endpoint exposes one Model Context Protocol tool, <code>page_to_markdown</code>.
@@ -29,7 +41,15 @@
     Because this is a <strong>hosted</strong> service, two things necessarily pass
     through this server's memory for the duration of a request: the URL you submit,
     and the content of the page fetched from it. Processing is transient — the
-    request is answered and the data is gone from the application.
+    request is answered and nothing is retained by the application. The legal
+    basis for this processing is performing the conversion you explicitly
+    requested, plus our legitimate interest in abuse prevention and security
+    (rate limiting).
+  </p>
+  <p>
+    One recipient is inherent to the design: <strong>the website you ask us to
+    convert</strong> receives an ordinary HTTP request from this server (with
+    this service's user-agent), exactly as it would from any visitor.
   </p>
   <p class="note">
     Do not submit URLs that embed credentials, session tokens, API keys, or signed
@@ -50,9 +70,25 @@
     Hosting is provided by <strong>Vercel Inc.</strong> (USA). Vercel keeps its
     standard operational logs — which include the caller's IP address, user agent,
     request path and timing — under
-    <a href="https://vercel.com/legal/privacy-policy">Vercel's privacy policy</a>
-    and retention defaults. We do not enrich, export, or sell these logs; we read
-    them only for abuse handling and debugging.
+    <a href="https://vercel.com/legal/privacy-notice">Vercel's privacy notice</a>.
+    We set no retention of our own on those logs and do not control Vercel's
+    schedule; the application itself retains nothing. We do not enrich, export,
+    <strong>sell or share</strong> these logs or any personal information; we read
+    logs only for abuse handling and debugging. Because hosting is in the United
+    States, requests from the EU/EEA are transferred to the US under the
+    safeguards described in Vercel's notice.
+  </p>
+
+  <h2>Your rights</h2>
+  <p>
+    The application stores no personal data, so there is nothing for us to
+    access, correct, export or delete on request — the answer to any such
+    request is genuinely "we hold nothing." For Vercel's operational logs,
+    Vercel's own privacy process applies. If you believe this service has
+    mishandled your data, contact us (above); EU/EEA users may also lodge a
+    complaint with their supervisory authority, and California residents have
+    the rights listed in the CCPA — including that we do not sell or share
+    personal information.
   </p>
   <p>
     If you reach this endpoint through a third-party directory or gateway that
