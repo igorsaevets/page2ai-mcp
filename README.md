@@ -28,6 +28,20 @@ the clients below rather than running it bare. Requires **Node.js 20+**. No API 
 `page2ai-mcp` is a thin unscoped wrapper around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp);
 since 0.2.5 it follows the latest server automatically via a `^` range.
 
+### Hosted endpoint (beta) — no install at all
+
+For clients that only accept a remote MCP server URL (Streamable HTTP):
+
+```
+https://page2ai-mcp-remote.vercel.app/api/mcp
+```
+
+Same tool, same code (see [`remote/`](./remote)), rate-limited per IP.
+**Privacy trade-off:** URLs sent to the hosted endpoint are fetched *from that
+server*, so they transit infrastructure operated by the author (on Vercel).
+Running locally via `npx` keeps everything on your machine — prefer it when you
+can.
+
 ### Claude Code
 
 ```bash
@@ -204,6 +218,11 @@ Planned: a `profile` argument (`auto | docs | marketing | research | dashboard |
 beyond the URLs you explicitly provide. Note that your AI client (Claude, ChatGPT, …)
 still sends the extracted Markdown to its own model provider under that client's privacy
 policy — that part is outside this server's control. See [PRIVACY.md](./PRIVACY.md) for details.
+
+The optional **hosted endpoint** is different by nature: URLs you ask it to convert are
+fetched from a server operated by the author (deployed on Vercel), and Vercel keeps its
+standard operational logs. No accounts, no tracking. If that trade-off matters for your
+use case, run the server locally — it is the same code.
 
 ## Protocol revisions
 

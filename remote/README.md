@@ -34,8 +34,11 @@ npm install
 npm run typecheck
 npx tsx scripts/local-serve.mts &   # terminal 1
 node scripts/smoke-remote.mjs       # terminal 2, defaults to localhost
-node scripts/smoke-remote.mjs https://<deployment>/api/mcp
+node scripts/smoke-remote.mjs https://page2ai-mcp-remote.vercel.app/api/mcp
 ```
+
+Production endpoint: **https://page2ai-mcp-remote.vercel.app/api/mcp**
+(deployed 2026-08-30; smoke passes in ~1 s).
 
 ## Deploy
 
