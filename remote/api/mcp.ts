@@ -29,10 +29,14 @@ function limited(ip: string): boolean {
 
   const entry = hits.get(ip);
   if (!entry || now > entry.resetAt) {
-    // Hard memory bound under address-rotation abuse; dropping fresh windows
-    // only makes the limiter more permissive for one window, never less safe
-    // for the instance thanks to the instance-wide counter above.
-    if (hits.size > 10_000) hits.clear();
+    // Memory bound under address-rotation abuse: evict only expired windows,
+    // never live ones, so a hot IP cannot ride a mass-eviction to a fresh
+    // window. The instance-wide counter above caps the blast radius anyway.
+    if (hits.size > 10_000) {
+      for (const [key, value] of hits) {
+        if (now > value.resetAt) hits.delete(key);
+      }
+    }
     hits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
     return false;
   }
@@ -58,8 +62,24 @@ const mcp = createMcpHandler(
   },
 );
 
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+  'access-control-allow-headers': 'content-type, accept, mcp-session-id, mcp-protocol-version, authorization',
+  'access-control-expose-headers': 'mcp-session-id, mcp-protocol-version',
+};
+
+function handleOptions(): Response {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 async function withLimit(req: Request): Promise<Response> {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  // x-real-ip is set by Vercel from the TCP connection and is not client-
+  // spoofable; x-forwarded-for's leftmost entry is the documented fallback.
+  const ip =
+    req.headers.get('x-real-ip')?.trim() ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown';
   if (limited(ip)) {
     return new Response(
       JSON.stringify({
@@ -69,11 +89,18 @@ async function withLimit(req: Request): Promise<Response> {
       }),
       {
         status: 429,
-        headers: { 'content-type': 'application/json', 'retry-after': '60' },
+        headers: { 'content-type': 'application/json', 'retry-after': '60', ...CORS_HEADERS },
       },
     );
   }
-  return mcp(req);
+  const response = await mcp(req);
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
-export { withLimit as GET, withLimit as POST, withLimit as DELETE };
+export { withLimit as GET, withLimit as POST, withLimit as DELETE, handleOptions as OPTIONS };
