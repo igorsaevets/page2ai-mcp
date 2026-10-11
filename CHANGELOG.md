@@ -5,9 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
-## Unreleased
+## 0.2.6 - 2026-10-11
+
+### Added
+- `serverInfo` carries `title` ("Page2AI"), `description` and `websiteUrl`, so clients that
+  render server metadata show a name and a link instead of the bare package name.
 
 ### Changed
+- **Releases are published through npm trusted publishing (OIDC)**, for `@page2ai/mcp` and
+  for the `page2ai-mcp` wrapper alike. The publish workflow holds no npm token; the registry
+  records GitHub Actions as the publisher, and the workflow fails when it records anyone else.
+- Lockfile refreshed to what a fresh install already resolves: `@page2ai/core` 0.1.11 (was
+  0.1.10; the 0.2.5 MCPB bundle carried 0.1.8), `@modelcontextprotocol/server` and
+  `@modelcontextprotocol/core` 2.3.1 (was 2.0.0), `zod` 4.5.4. Dependency ranges are
+  unchanged, so `npx` users get the same tree as before; the lock decides what the MCPB
+  bundle carries, and the 0.2.6 bundle now matches it.
+- README header leads with the LLM context use case (ChatGPT, Claude, Gemini); install notes
+  added for Antigravity and the Claude Desktop one-click bundle.
 - README restyled after a 10-reviewer documentation audit (2026-08-29): badges, quick start
   first, per-client install blocks for Claude Code / Claude Desktop / Cursor (deeplink) /
   VS Code / Codex CLI / Gemini CLI / Windsurf / Zed, and a verbatim output sample. Two
@@ -16,8 +30,8 @@ major version is `0`, a minor bump may carry breaking changes.
   `command`/`args`, the nested `command.path` form is legacy). Node.js 20+ requirement now
   stated up front. The "Zero external API calls" phrasing replaced with the accurate "the
   only network requests are to the URLs you pass it".
-- MCPB `manifest.json` refreshed: version synced to 0.2.5, node runtime `>=20`, description
-  overclaim fixed.
+- MCPB `manifest.json` refreshed: version kept in step with `package.json`, node runtime
+  `>=20`, description overclaim fixed, the real tool arguments documented.
 - Personal email removed from README, `manifest.json` and `package.json` author metadata —
   same one-policy cleanup as the 0.2.4 Code of Conduct change; contact routes through the
   GitHub handle.

@@ -1,6 +1,6 @@
 {
   "name": "@page2ai/mcp",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "mcpName": "io.github.igorsaevets/page2ai-mcp",
   "description": "MCP server that converts any web page URL to clean Markdown for LLM context. Processing is local and SSRF-guarded; no external APIs, no telemetry.",
   "type": "module",
