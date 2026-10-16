@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.2.7 - 2026-10-16
+
+### Changed
+- **`@page2ai/core` 0.1.12**, and the dependency range starts there (`^0.1.12`, was `^0.1.7`),
+  so no install of this version resolves an older core. What `page_to_markdown` returns
+  changes on most pages (core CHANGELOG, 0.1.12):
+  - text sitting directly in a `<div>`, `<section>` or `<span>` is no longer dropped (on a
+    server-rendered admin page 25 of 26 labels and values were missing while every heading
+    and table survived);
+  - code blocks, tables and paragraphs inside a list item stay in the item;
+  - table cells keep their links, code and emphasis, and a table nested in a cell stays in
+    that cell instead of repeating its rows in the outer table;
+  - content under the `hidden` attribute is left out, except tab panels, hidden blocks
+    holding code, `hidden="until-found"` sections and React streaming segments. Hidden text
+    can carry instructions the person reading the page never sees; ordinary hidden content
+    no longer reaches the agent, the kinds kept above still do.
+- Lockfile: only `@page2ai/core` moves (0.1.11 to 0.1.12); `@modelcontextprotocol/server`
+  and `/core` stay 2.3.1, `zod` 4.5.4. The lock decides what the MCPB bundle carries.
+
 ## 0.2.6 - 2026-10-11
 
 ### Added
