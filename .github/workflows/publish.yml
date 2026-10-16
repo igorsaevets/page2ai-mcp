@@ -5,11 +5,28 @@ name: Publish to npm (with provenance)
 #
 # Authentication is npm trusted publishing (OIDC): the registry trusts this
 # workflow file of this repository for @page2ai/mcp and page2ai-mcp, so no npm
-# token is stored anywhere. The trust lives on npmjs.com (`npm trust github`),
-# and a NEW trust configuration expires unless a publish validates it within
-# 2 days (docs.npmjs.com/trusted-publishers). Dispatching this workflow with
-# oidc_probe=true checks that the registry accepts it for both packages and
-# publishes nothing; a plain dispatch still publishes whatever is missing.
+# token is stored anywhere. The trust lives on npmjs.com (`npm trust github`)
+# and names this file, so the file must stay publish.yml. A NEW trust
+# configuration expires unless a publish validates it within 2 days
+# (docs.npmjs.com/trusted-publishers).
+#
+# The trust names the file, not a job: ANY job of this file that holds
+# id-token: write can trade its OIDC token for an npm publish token. So the work
+# is split (BACKLOG BL-33):
+#   build        - npm ci, type-check, test, build, npm pack of both packages.
+#                  No id-token, so nothing it runs (dependency code, test
+#                  tooling) can publish.
+#   publish      - checks the two tarballs the build job handed over and runs
+#                  `npm publish <tarball>`: no checkout, no npm ci, no script of
+#                  either package.
+#   verify       - reads both releases back from the registry. No id-token.
+#   mcp-registry - publishes server.json to the MCP Registry. It needs the OIDC
+#                  token too, so the one tool it runs, mcp-publisher, is pinned
+#                  to a release and checked against its SHA-256 before it runs.
+# Dispatching with oidc_probe=true runs the same jobs, but publish is a dry run
+# (npm still does the real OIDC exchange, so it proves the registry accepts this
+# file for both packages), verify reads the version that is already live, and
+# mcp-registry only validates server.json and logs in. Nothing is uploaded.
 on:
   push:
     tags: ['v*']
@@ -20,57 +37,70 @@ on:
         type: boolean
         default: false
 
+# Nothing is granted by default; each job names what it needs.
+permissions: {}
+
+# Two runs for the same ref never publish at once, and a publish is never
+# cancelled halfway.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 # GitHub's implicit shell for `run:` is `bash -e {0}` -- `-e` is on, `pipefail` is
 # NOT. So `X=$(cmd | head -n 1)` succeeds with X empty when `cmd` fails, because
 # `head` is the last command in the pipe. Naming the shell explicitly gets
 # `bash --noprofile --norc -eo pipefail {0}`, which fails the step instead.
+# The flip side: never `producer | grep -q`, because grep quits at the first
+# match, the producer dies of SIGPIPE and the pipe reports failure.
 defaults:
   run:
     shell: bash
 
 jobs:
-  publish:
-    name: Build, test and publish
-    if: ${{ !inputs.oidc_probe }}
+  build:
+    name: Build, test and pack (cannot publish)
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     permissions:
-      contents: read
-      # Trusted publishing: npm exchanges this job's OIDC token for a
-      # short-lived publish token, and Sigstore signs the provenance
-      # attestation with the same identity. Without it the publish fails with
-      # ENEEDAUTH, because there is no stored token to fall back on.
-      id-token: write
+      contents: read # checkout
+
+    outputs:
+      version: ${{ steps.pack.outputs.version }}
+      scoped_name: ${{ steps.pack.outputs.scoped_name }}
+      scoped_file: ${{ steps.pack.outputs.scoped_file }}
+      scoped_integrity: ${{ steps.pack.outputs.scoped_integrity }}
+      wrapper_name: ${{ steps.pack.outputs.wrapper_name }}
+      wrapper_file: ${{ steps.pack.outputs.wrapper_file }}
+      wrapper_integrity: ${{ steps.pack.outputs.wrapper_integrity }}
 
     steps:
+      - name: Publish only from a v* tag
+        # A dispatch runs on whatever ref it names, and the npm trust does not
+        # look at the ref. A branch may only run the probe.
+        if: ${{ !inputs.oidc_probe && !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          echo "::error::a real publish runs only from a v* tag; to test a branch, dispatch with oidc_probe=true"
+          exit 1
+
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           # No dependency cache in a release build, as npm's trusted publishing
-          # guide says: whatever is restored into this job runs with the right
-          # to publish.
+          # guide says: whatever is restored here ends up in the tarball.
           package-manager-cache: false
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Check that npm supports trusted publishing
-        # npm older than 11.5.1 never attempts the OIDC exchange and then fails
-        # with a misleading ENEEDAUTH. Node 24 bundles a new enough npm today;
-        # this turns a future downgrade into a clear error.
-        run: |
-          V="$(npm --version)"
-          if ! node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$V"; then
-            echo "::error::npm $V cannot use trusted publishing; it needs npm >= 11.5.1"
-            exit 1
-          fi
-          echo "npm $V supports trusted publishing"
 
       - name: Install dependencies
-        run: npm ci
+        # No dependency runs an install script here. The lock has one
+        # (fsevents, macOS only, never installed on Linux), so nothing is lost,
+        # and a dependency that adds one in a later version cannot run it.
+        run: npm ci --ignore-scripts
 
       - name: Type-check
         run: npm run typecheck
@@ -84,8 +114,6 @@ jobs:
       - name: Verify the tag matches package.json
         # A tag that disagrees with the manifest publishes a version nobody
         # asked for and cannot be undone; npm forbids re-publishing a version.
-        # Only meaningful on a tag push. On workflow_dispatch GITHUB_REF_NAME is
-        # the branch, so comparing it to the version would fail every manual run.
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG="${GITHUB_REF_NAME#v}"
@@ -109,38 +137,12 @@ jobs:
             exit 1
           fi
 
-      - name: Check whether the scoped version is already on the registry
-        id: scoped
-        run: |
-          V="$(node -p "require('./package.json').version")"
-          if npm view "@page2ai/mcp@$V" version >/dev/null 2>&1; then
-            echo "@page2ai/mcp@$V is already published; skipping"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish
-        # Authenticates through trusted publishing. Provenance is automatic
-        # there; --provenance only makes it explicit.
-        if: steps.scoped.outputs.publish == 'true'
-        run: npm publish --provenance --access public
-
-      - name: Verify the attestation is live
-        # npm audit signatures checks the published tarball against the registry's
-        # signatures and attestations. Running it here means a publish that
-        # silently lost its provenance fails the workflow instead of looking fine.
-        run: |
-          sleep 20
-          npm audit signatures || echo "attestation not visible yet; check the package page"
-
       # The unscoped name is the one people actually type (`npx -y page2ai-mcp`),
       # and until 2026-07-28 it was the weakest link in the chain: published by
       # hand in July, so it carries no provenance attestation at all, its source
       # existed nowhere in this repository, and it sat at 0.1.0 while the scoped
       # package had moved to 0.1.2. Publishing it from here fixes all three.
       - name: Check the wrapper version
-        id: wrapper
         run: |
           WANT="$(node -p "require('./wrapper/package.json').version")"
           MAIN="$(node -p "require('./package.json').version")"
@@ -157,120 +159,372 @@ jobs:
             echo "::error::wrapper depends on @page2ai/mcp '$DEP'; expected '^$MAIN'"
             exit 1
           fi
-          if npm view "page2ai-mcp@$WANT" version >/dev/null 2>&1; then
-            echo "page2ai-mcp@$WANT is already published; skipping"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
 
-      - name: Publish the unscoped wrapper with provenance
-        if: steps.wrapper.outputs.publish == 'true'
-        working-directory: wrapper
-        run: npm publish --provenance --access public
-
-      - name: Verify the releases went through trusted publishing
-        # The registry records GitHub Actions (npm-oidc-no-reply@github.com) as
-        # the publisher of a version published over OIDC, and the account owner
-        # for a token publish. This keeps "no stored token" checked on every
-        # release instead of assumed. Only packages published by THIS run.
-        if: steps.scoped.outputs.publish == 'true' || steps.wrapper.outputs.publish == 'true'
-        env:
-          SCOPED: ${{ steps.scoped.outputs.publish }}
-          WRAPPER: ${{ steps.wrapper.outputs.publish }}
+      - name: Pack both packages
+        id: pack
+        # npm pack runs no script of either package (neither has prepack,
+        # prepare or postpack), so the tarballs hold exactly what was built and
+        # tested above. Both are named page2ai-mcp-<version>.tgz (the scope is
+        # dropped from the file name), hence one folder each.
         run: |
-          V="$(node -p "require('./package.json').version")"
-          PKGS=""
-          if [ "$SCOPED" = true ]; then PKGS="$PKGS @page2ai/mcp"; fi
-          if [ "$WRAPPER" = true ]; then PKGS="$PKGS page2ai-mcp"; fi
-          FAIL=0
-          for P in $PKGS; do
-            U=""
-            # With --json, a version the registry cannot see yet prints an E404
-            # JSON body and exits 1, so success is the exit code, not the output.
-            for _ in 1 2 3 4 5 6; do
-              if U="$(npm view "$P@$V" _npmUser --json 2>/dev/null)"; then break; fi
-              U=""
-              sleep 10
-            done
-            case "$U" in
-              *npm-oidc-no-reply@github.com*) echo "$P@$V was published by trusted publishing" ;;
-              "") echo "::warning::$P@$V is not visible on the registry yet; check its publisher later" ;;
-              *) echo "::error::$P@$V was not published by trusted publishing: $U"; FAIL=1 ;;
-            esac
-          done
-          exit "$FAIL"
+          mkdir -p "$RUNNER_TEMP/pack/scoped" "$RUNNER_TEMP/pack/wrapper"
+          npm pack --json --pack-destination "$RUNNER_TEMP/pack/scoped" >"$RUNNER_TEMP/scoped.json"
+          (cd wrapper && npm pack --json --pack-destination "$RUNNER_TEMP/pack/wrapper") >"$RUNNER_TEMP/wrapper.json"
+          node -e '
+            const fs = require("fs");
+            const [s] = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const [w] = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+            if (s.version !== w.version) throw new Error(`packed ${s.version} and ${w.version}`);
+            console.log([`version=${s.version}`,
+              `scoped_name=${s.name}`, `scoped_file=${s.filename}`, `scoped_integrity=${s.integrity}`,
+              `wrapper_name=${w.name}`, `wrapper_file=${w.filename}`, `wrapper_integrity=${w.integrity}`].join("\n"));
+          ' "$RUNNER_TEMP/scoped.json" "$RUNNER_TEMP/wrapper.json" | tee -a "$GITHUB_OUTPUT"
 
-      # npm publishing alone never updates the MCP Registry — it ingests
-      # server.json only through mcp-publisher, which is why the registry sat
-      # at 0.1.1 while npm moved to 0.2.4. Auth is GitHub OIDC (the job's
-      # id-token: write again), which proves the io.github.igorsaevets/*
-      # namespace from inside this repo without any stored secret.
-      - name: Check whether this version is already in the MCP Registry
-        id: registry
-        run: |
-          V="$(node -p "require('./server.json').version")"
-          LIVE="$(curl -sf "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.igorsaevets/page2ai-mcp" \
-            | jq -r '[.servers[]? | (.server // .) | select(.name == "io.github.igorsaevets/page2ai-mcp") | .version] | join(" ")' \
-            || echo "")"
-          echo "registry has: ${LIVE:-nothing}; server.json is $V"
-          case " $LIVE " in
-            *" $V "*) echo "publish=false" >> "$GITHUB_OUTPUT" ;;
-            *)        echo "publish=true"  >> "$GITHUB_OUTPUT" ;;
-          esac
+      - name: Hand the tarballs to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-tarballs
+          path: ${{ runner.temp }}/pack/
+          if-no-files-found: error
+          # "Re-run all jobs" uploads the same name again.
+          overwrite: true
 
-      - name: Install mcp-publisher
-        if: steps.registry.outputs.publish == 'true'
-        run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
-
-      - name: Authenticate to MCP Registry (GitHub OIDC)
-        if: steps.registry.outputs.publish == 'true'
-        run: ./mcp-publisher login github-oidc
-
-      - name: Publish server.json to MCP Registry
-        if: steps.registry.outputs.publish == 'true'
-        run: ./mcp-publisher publish
-
-  oidc-probe:
-    name: Check trusted publishing (publishes nothing)
-    if: ${{ inputs.oidc_probe }}
+  publish:
+    name: Publish the tarballs to npm
+    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     permissions:
-      contents: read
-      id-token: write
+      # Trusted publishing: npm exchanges this job's OIDC token for a
+      # short-lived publish token, and Sigstore signs the provenance
+      # attestation with the same identity. Without it the publish fails with
+      # ENEEDAUTH, because there is no stored token to fall back on.
+      id-token: write # npm trusted publishing + Sigstore provenance
+
+    outputs:
+      published_scoped: ${{ steps.publish.outputs.published_scoped }}
+      published_wrapper: ${{ steps.publish.outputs.published_wrapper }}
+
+    # One line per package, scoped first: the wrapper depends on it.
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      PACKAGES: |
+        scoped ${{ needs.build.outputs.scoped_name }} ${{ needs.build.outputs.scoped_file }} ${{ needs.build.outputs.scoped_integrity }}
+        wrapper ${{ needs.build.outputs.wrapper_name }} ${{ needs.build.outputs.wrapper_file }} ${{ needs.build.outputs.wrapper_integrity }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
       - name: Setup Node.js 24 LTS
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           package-manager-cache: false
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Check that npm supports trusted publishing
+        # npm older than 11.5.1 never attempts the OIDC exchange and then fails
+        # with a misleading ENEEDAUTH. Node 24 bundles a new enough npm today;
+        # this turns a future downgrade into a clear error.
+        run: |
+          V="$(npm --version)"
+          if ! node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$V"; then
+            echo "::error::npm $V cannot use trusted publishing; it needs npm >= 11.5.1"
+            exit 1
+          fi
+          echo "npm $V supports trusted publishing"
+
+      - name: Download the tarballs the build job packed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarballs
+          path: ${{ runner.temp }}/release
+
+      - name: Check the tarballs
+        # Nothing is published that the build job did not pack: the bytes match
+        # its integrity, the manifest inside names the expected package and
+        # version, and nothing in it runs at install time on a user's machine
+        # (the way npm worms spread). The last check holds even if the build
+        # job was hijacked.
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          while read -r DIR NAME FILE INTEGRITY; do
+            [ -n "$DIR" ] || continue
+            case "$DIR:$NAME" in
+              scoped:@page2ai/mcp | wrapper:page2ai-mcp) ;;
+              *) fail "the build job packed '$NAME' as '$DIR'" ;;
+            esac
+            [[ "$FILE" =~ ^[A-Za-z0-9._-]+\.tgz$ ]] && [ -f "$DIR/$FILE" ] || fail "no tarball '$DIR/$FILE' was handed over"
+            GOT="sha512-$(openssl dgst -sha512 -binary "$DIR/$FILE" | base64 -w0)"
+            [ "$GOT" = "$INTEGRITY" ] || fail "$DIR/$FILE is $GOT, but the build job packed $INTEGRITY"
+            tar -xzOf "$DIR/$FILE" package/package.json >"$RUNNER_TEMP/manifest.json"
+            jq -e --arg n "$NAME" --arg v "$VERSION" '.name == $n and .version == $v' "$RUNNER_TEMP/manifest.json" >/dev/null \
+              || fail "the manifest inside $DIR/$FILE is not $NAME@$VERSION"
+            HOOKS="$(jq -r '(.scripts // {}) | keys[] | select(. == "preinstall" or . == "install" or . == "postinstall")' "$RUNNER_TEMP/manifest.json")"
+            [ -z "$HOOKS" ] || fail "$DIR/$FILE declares install-time scripts: $HOOKS"
+            tar -tzf "$DIR/$FILE" >"$RUNNER_TEMP/files.txt"
+            ! grep -qx 'package/binding.gyp' "$RUNNER_TEMP/files.txt" || fail "$DIR/$FILE has a binding.gyp, which npm builds at install time"
+            echo "$NAME@$VERSION: $DIR/$FILE, $(wc -l <"$RUNNER_TEMP/files.txt") files, $INTEGRITY"
+          done <<<"$PACKAGES"
+
+      - name: Publish
+        # Authenticates through trusted publishing; provenance is automatic
+        # there, --provenance only makes it explicit. A tarball runs no
+        # lifecycle script (npm runs them for a directory publish only), and
+        # --ignore-scripts says so. A version already on the registry (a re-run
+        # after a later step failed) is left alone.
+        id: publish
+        if: ${{ !inputs.oidc_probe }}
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          while read -r DIR NAME FILE _; do
+            [ -n "$DIR" ] || continue
+            CODE="$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${NAME/\//%2f}/$VERSION")"
+            case "$CODE" in
+              200) echo "$NAME@$VERSION is already on the registry; nothing to publish" ;;
+              404) npm publish "./$DIR/$FILE" --provenance --access public --ignore-scripts
+                   echo "published_$DIR=true" >>"$GITHUB_OUTPUT" ;;
+              *)   echo "::error::the registry answered HTTP $CODE for $NAME@$VERSION; not publishing blind"; exit 1 ;;
+            esac
+          done <<<"$PACKAGES"
+
       - name: Ask the registry for a publish token for each package (dry run)
         # npm publish runs its OIDC exchange before it looks at --dry-run, so a
-        # dry run proves the registry accepts this workflow for the package and
+        # dry run proves the registry accepts this job for the package and
         # uploads nothing; npm never prints the short-lived token it gets back.
         # npm still exits 1 when this version is already published, so the
         # verdict comes from npm's own log line, not from its exit code.
+        if: ${{ inputs.oidc_probe }}
+        working-directory: ${{ runner.temp }}/release
         run: |
           FAIL=0
-          for DIR in . wrapper; do
-            NAME="$(node -p "require('./$DIR/package.json').name")"
-            LOG="$RUNNER_TEMP/oidc-probe-${NAME//[@\/]/_}.log"
-            (cd "$DIR" && npm publish --dry-run --ignore-scripts --loglevel verbose) >"$LOG" 2>&1 || true
+          while read -r DIR NAME FILE _; do
+            [ -n "$DIR" ] || continue
+            LOG="$RUNNER_TEMP/oidc-probe-$DIR.log"
+            npm publish "./$DIR/$FILE" --dry-run --ignore-scripts --loglevel verbose >"$LOG" 2>&1 || true
             if grep -q 'oidc Successfully retrieved and set token' "$LOG"; then
-              echo "$NAME: trusted publishing accepts this workflow"
+              echo "$NAME: trusted publishing accepts the publish job of this workflow"
             else
               WHY="$(grep -m1 'verbose oidc' "$LOG" || echo 'npm logged no OIDC step')"
               echo "::error::$NAME: trusted publishing does not accept this workflow: $WHY"
               FAIL=1
             fi
+          done <<<"$PACKAGES"
+          exit "$FAIL"
+
+  verify:
+    name: Read both releases back from the registry (cannot publish)
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions: {}
+
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      PROBE: ${{ inputs.oidc_probe }}
+      PACKAGES: |
+        ${{ needs.build.outputs.scoped_name }} ${{ needs.build.outputs.scoped_integrity }} ${{ needs.publish.outputs.published_scoped }}
+        ${{ needs.build.outputs.wrapper_name }} ${{ needs.build.outputs.wrapper_integrity }} ${{ needs.publish.outputs.published_wrapper }}
+
+    steps:
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Publisher, provenance and bytes, from the per-version documents
+        # In the T105 release `npm view` missed two fresh versions for over a
+        # minute while the per-version document already served them, so this
+        # reads that document and gives it up to 10 minutes. A probe reads the
+        # version that is already live, if there is one.
+        id: doc
+        run: |
+          FAIL=0
+          LIVE_ALL=true
+          while read -r NAME INTEGRITY PUBLISHED; do
+            [ -n "$NAME" ] || continue
+            URL="https://registry.npmjs.org/${NAME/\//%2f}/$VERSION"
+            DOC="$RUNNER_TEMP/version.json"
+            TRIES=60
+            if [ "$PROBE" = true ]; then TRIES=1; fi
+            for i in $(seq 1 "$TRIES"); do
+              if curl -sf -o "$DOC" "$URL"; then break; fi
+              rm -f "$DOC"
+              if [ "$i" -lt "$TRIES" ]; then sleep $((5 + RANDOM % 6)); fi
+            done
+            if [ ! -s "$DOC" ]; then
+              if [ "$PROBE" = true ]; then
+                echo "::notice::$NAME@$VERSION is not on the registry, so the probe has nothing to read back"
+                LIVE_ALL=false
+                continue
+              fi
+              echo "::error::$NAME@$VERSION is still not on the registry about 10 minutes after the publish"
+              FAIL=1
+              continue
+            fi
+            jq -c --arg n "$NAME" '{package: $n, _npmUser, integrity: .dist.integrity, provenance: .dist.attestations.provenance.predicateType}' "$DOC"
+            if ! jq -e '._npmUser.email == "npm-oidc-no-reply@github.com" and ._npmUser.trustedPublisher.id == "github"' "$DOC" >/dev/null; then
+              echo "::error::$NAME@$VERSION was not published by trusted publishing"; FAIL=1
+            fi
+            if ! jq -e '.dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"' "$DOC" >/dev/null; then
+              echo "::error::$NAME@$VERSION carries no SLSA provenance"; FAIL=1
+            fi
+            LIVE="$(jq -r '.dist.integrity' "$DOC")"
+            if [ "$LIVE" = "$INTEGRITY" ]; then
+              echo "$NAME@$VERSION on the registry is byte-identical to the tarball this run packed"
+            elif [ "$PUBLISHED" = true ]; then
+              echo "::error::$NAME@$VERSION on the registry is $LIVE, but this run packed and published $INTEGRITY"; FAIL=1
+            else
+              echo "::notice::$NAME@$VERSION was published before this run and differs from this build ($LIVE, this run packed $INTEGRITY)"
+            fi
+          done <<<"$PACKAGES"
+          echo "live=$LIVE_ALL" >>"$GITHUB_OUTPUT"
+          exit "$FAIL"
+
+      - name: Signatures and attestations, verified by npm
+        # npm audit signatures checks the registry signature of every package it
+        # installed and the Sigstore bundle of every attestation, and exits 1 on
+        # an invalid or missing one. Installing the wrapper pulls the scoped
+        # package at the same version, so one scratch install covers both; the
+        # repository's own node_modules never contains either. Fresh versions
+        # can be missing from what `npm install` resolves for a few minutes,
+        # hence the retries.
+        if: steps.doc.outputs.live == 'true'
+        run: |
+          mkdir "$RUNNER_TEMP/audit"
+          cd "$RUNNER_TEMP/audit"
+          npm init -y >/dev/null
+          TRIES=60
+          if [ "$PROBE" = true ]; then TRIES=3; fi
+          for i in $(seq 1 "$TRIES"); do
+            if npm install --ignore-scripts --no-audit --no-fund "page2ai-mcp@$VERSION" "@page2ai/mcp@$VERSION" >/dev/null 2>"$RUNNER_TEMP/install.err"; then break; fi
+            if [ "$i" -eq "$TRIES" ]; then
+              cat "$RUNNER_TEMP/install.err"
+              echo "::error::npm cannot install page2ai-mcp@$VERSION and @page2ai/mcp@$VERSION"
+              exit 1
+            fi
+            sleep $((5 + RANDOM % 6))
+          done
+          if ! npm audit signatures --json --include-attestations >"$RUNNER_TEMP/audit.json"; then
+            jq -c '{invalid, missing}' "$RUNNER_TEMP/audit.json" || cat "$RUNNER_TEMP/audit.json"
+            echo "::error::npm audit signatures failed for the install of page2ai-mcp@$VERSION"
+            exit 1
+          fi
+          FAIL=0
+          for NAME in @page2ai/mcp page2ai-mcp; do
+            if jq -e --arg n "$NAME" --arg v "$VERSION" 'any((.verified // [])[]; .name == $n and .version == $v)' "$RUNNER_TEMP/audit.json" >/dev/null; then
+              echo "$NAME@$VERSION: registry signature and provenance attestation verified by npm audit signatures"
+            else
+              echo "::error::npm verified no attestation for $NAME@$VERSION"; FAIL=1
+            fi
           done
           exit "$FAIL"
+
+  # npm publishing alone never updates the MCP Registry: it ingests server.json
+  # only through mcp-publisher, which is why the registry sat at 0.1.1 while npm
+  # moved to 0.2.4. Auth is GitHub OIDC, which proves the io.github.igorsaevets/*
+  # namespace from inside this repo without any stored secret.
+  mcp-registry:
+    name: Publish server.json to the MCP Registry
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read # checkout, for server.json
+      # mcp-publisher logs in with this job's OIDC token. The npm trust names
+      # this FILE, so the same token could also be traded for an npm publish
+      # token; that is why the tool is pinned and hash-checked below.
+      id-token: write # mcp-publisher login github-oidc
+
+    env:
+      PROBE: ${{ inputs.oidc_probe }}
+      # Pinned instead of releases/latest. The SHA-256 of
+      # mcp-publisher_linux_amd64.tar.gz of v1.8.1 (released 2026-08-06, the
+      # latest on 2026-10-16) matched, on 2026-10-16, the release's
+      # registry_1.8.1_checksums.txt, GitHub's asset digest and its Sigstore
+      # bundle (`sigstore verify github`, refs/tags/v1.8.1). To move to a new
+      # release, change both lines after the same three checks.
+      MCP_PUBLISHER_VERSION: 1.8.1
+      MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check whether this version is already in the MCP Registry
+        # The per-version endpoint answers 200 or 404 at once. The search
+        # endpoint used before still listed 0.2.5 as latest minutes after 0.2.6
+        # went live (T105), so a re-run would have tried to publish twice.
+        id: registry
+        run: |
+          NAME="$(jq -r .name server.json)"
+          V="$(jq -r .version server.json)"
+          URL="https://registry.modelcontextprotocol.io/v0.1/servers/${NAME/\//%2F}/versions/$V"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' "$URL")"
+          case "$CODE" in
+            200) echo "$NAME $V is already in the MCP Registry"; echo "publish=false" >>"$GITHUB_OUTPUT" ;;
+            404) echo "$NAME $V is not in the MCP Registry yet"; echo "publish=true" >>"$GITHUB_OUTPUT" ;;
+            *)   echo "::error::the MCP Registry answered HTTP $CODE for $NAME $V"; exit 1 ;;
+          esac
+          {
+            echo "name=$NAME"
+            echo "version=$V"
+            echo "url=$URL"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Install mcp-publisher (pinned, hash-checked)
+        run: |
+          TGZ="$RUNNER_TEMP/mcp-publisher.tar.gz"
+          curl -fsSL -o "$TGZ" "https://github.com/modelcontextprotocol/registry/releases/download/v$MCP_PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$MCP_PUBLISHER_SHA256  $TGZ" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/mcp-publisher"
+          tar -xzf "$TGZ" -C "$RUNNER_TEMP/mcp-publisher" mcp-publisher
+          echo "$RUNNER_TEMP/mcp-publisher" >>"$GITHUB_PATH"
+
+      - name: Validate server.json
+        run: mcp-publisher validate
+
+      - name: Wait until npm serves the package the entry points to
+        # The registry checks the npm package's mcpName when it accepts the
+        # entry, so the version must be visible on npm first.
+        if: ${{ !inputs.oidc_probe && steps.registry.outputs.publish == 'true' }}
+        env:
+          V: ${{ steps.registry.outputs.version }}
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf -o /dev/null "https://registry.npmjs.org/@page2ai%2fmcp/$V"; then
+              echo "@page2ai/mcp@$V is on npm"
+              exit 0
+            fi
+            sleep $((5 + RANDOM % 6))
+          done
+          echo "::error::@page2ai/mcp@$V is still not on npm about 10 minutes after the publish"
+          exit 1
+
+      - name: Authenticate to the MCP Registry (GitHub OIDC)
+        if: ${{ inputs.oidc_probe || steps.registry.outputs.publish == 'true' }}
+        run: mcp-publisher login github-oidc
+
+      - name: Publish server.json to the MCP Registry
+        if: ${{ !inputs.oidc_probe && steps.registry.outputs.publish == 'true' }}
+        run: mcp-publisher publish
+
+      - name: Read the entry back
+        if: ${{ !inputs.oidc_probe && steps.registry.outputs.publish == 'true' }}
+        env:
+          URL: ${{ steps.registry.outputs.url }}
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf -o "$RUNNER_TEMP/entry.json" "$URL"; then
+              jq -c '{version: .server.version, official: ._meta["io.modelcontextprotocol.registry/official"]}' "$RUNNER_TEMP/entry.json"
+              exit 0
+            fi
+            sleep $((5 + RANDOM % 6))
+          done
+          echo "::error::the MCP Registry does not serve $URL about 5 minutes after the publish"
+          exit 1
