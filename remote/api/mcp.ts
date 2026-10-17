@@ -55,7 +55,7 @@ const serverInfoWithMetadata = {
   version: '0.1.0',
   title: 'Page2AI (hosted)',
   description:
-    'Convert any webpage or HTML to clean Markdown for ChatGPT, Claude, and Gemini ' +
+    'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
     'context. Preserves code blocks with language hints, tables, and reading structure. ' +
     'Zero telemetry, MIT-licensed. Hosted variant of @page2ai/mcp.',
   websiteUrl: 'https://page2ai-mcp-remote.vercel.app',

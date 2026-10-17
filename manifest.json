@@ -4,7 +4,7 @@
   "display_name": "Page2AI — Web to Markdown",
   "version": "0.2.7",
   "description": "Convert any web page to clean Markdown for LLM context",
-  "long_description": "Page2AI MCP converts web pages to Markdown optimized for AI context windows. Extracts main content using DOM-position-aware dedup, preserves code blocks with language hints, converts tables and lists, and strips navigation, ads, and cookie banners. The only network requests are to the URLs you pass it — pure Node + linkedom, no browser, no external services, no telemetry.\n\nCompanion to the Page2AI Chrome extension. Shares the same extraction core (@page2ai/core) with the browser extension available at https://github.com/igorsaevets/page2ai-extension.",
+  "long_description": "Page2AI MCP converts a web page URL to Markdown for AI context windows. It keeps the page's main content (its <main> or dominant <article>), preserves code blocks with language hints, converts tables and lists, and drops navigation, headers, footers and sidebars. The only network requests go to the URL you pass it and its .md twin, which docs platforms such as Mintlify serve: pure Node + linkedom, no browser, no cookies, no page scripts, no external services, no telemetry. A page behind a sign-in, or one rendered only by JavaScript, is therefore out of its reach.\n\nCompanion to the Page2AI browser extension (https://github.com/igorsaevets/page2ai-extension), which converts the live page in your own browser, including pages behind a sign-in. Built on the open-source @page2ai/core library.",
   "author": {
     "name": "Igor Saevets",
     "url": "https://github.com/igorsaevets"
@@ -44,7 +44,7 @@
   "tools": [
     {
       "name": "page_to_markdown",
-      "description": "Fetch a web page URL and convert it to clean Markdown. Preserves headings, code blocks, links, and tables; strips ads, navigation, cookie banners, and footers."
+      "description": "Fetch a web page URL and convert it to clean Markdown. Preserves headings, code blocks, links, and tables; keeps the main content and drops navigation, headers, footers, and sidebars. No cookies, no page scripts: a page behind a sign-in is out of its reach."
     }
   ],
   "compatibility": {
