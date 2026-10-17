@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## Unreleased
+
+### Fixed
+- **What the server says about itself now matches what it does.** `server.json` (shown by the MCP
+  Registry and the directories that copy it), the server's `serverInfo` and the hosted variant's said
+  it converts "web pages or HTML": its one tool takes a URL. The tool description and the MCPB
+  manifest said it "strips ads ... and cookie banners": it has no ad or cookie-banner filter; it keeps
+  the page's main content and drops navigation, headers, footers and sidebars, which they now say. The
+  manifest no longer says the server shares the browser extension's extraction core (the extension
+  runs its own in-page pipeline), and the tool description now tells the model that a page behind a
+  sign-in, or one rendered only by JavaScript, is out of this tool's reach.
+
 ## 0.2.7 - 2026-10-16
 
 ### Changed

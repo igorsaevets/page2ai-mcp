@@ -53,7 +53,7 @@ const buildServer = (): Server => {
       version: SERVER_VERSION,
       title: 'Page2AI',
       description:
-        'Convert any webpage or HTML to clean Markdown for ChatGPT, Claude, and Gemini ' +
+        'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
         'context. Preserves code blocks with language hints, tables, and reading structure. ' +
         'Zero telemetry, MIT-licensed.',
       websiteUrl: 'https://github.com/igorsaevets/page2ai-mcp',

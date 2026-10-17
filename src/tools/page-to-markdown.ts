@@ -32,8 +32,11 @@ export const pageToMarkdownDefinition = {
   title: 'Convert Page to Markdown',
   description:
     'Fetch a web page URL and convert it to clean Markdown optimized for LLM context. ' +
-    'Preserves headings, code blocks (with language hints), links, and tables; strips ads, ' +
-    'navigation, and cookie banners. For Mintlify docs (docs.anthropic.com, OpenAI platform, ' +
+    'Preserves headings, code blocks (with language hints), links, and tables; keeps the ' +
+    'main content and drops navigation, headers, footers, and sidebars. It fetches without ' +
+    'cookies and runs no page scripts, so a page behind a sign-in or one rendered only by ' +
+    'JavaScript comes back as its login page or with no content; read those through a browser ' +
+    'tool instead. For Mintlify docs (docs.anthropic.com, OpenAI platform, ' +
     'Vercel, Stripe, etc.) tries the `URL.md` convention first for cleanest output. ' +
     'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
     'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +

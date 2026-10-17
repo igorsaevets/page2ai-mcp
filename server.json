@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.igorsaevets/page2ai-mcp",
   "title": "Page2AI — Web to Markdown",
-  "description": "Convert web pages or HTML to clean Markdown for LLM context. Local, no external API calls.",
+  "description": "Convert a web page URL to clean Markdown for LLM context. Local, no external API calls.",
   "repository": {
     "url": "https://github.com/igorsaevets/page2ai-mcp",
     "source": "github"
