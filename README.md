@@ -13,8 +13,9 @@ bots, and this README only shows numbers a human can trust.</sub>
 > Fetch, extract, convert — one tool, one command, entirely on your machine.
 > No API key, no account, no telemetry; the only network requests are to the URLs you pass it.
 
-Companion to the [Page2AI Chrome & Firefox extensions](https://github.com/igorsaevets/page2ai-extension);
-both share the same [`@page2ai/core`](https://npmjs.com/package/@page2ai/core) extraction library.
+Companion to the [Page2AI Chrome & Firefox extensions](https://github.com/igorsaevets/page2ai-extension),
+which convert the live page in your own browser with their own pipeline. This server is built on
+[`@page2ai/core`](https://npmjs.com/package/@page2ai/core).
 
 ## Quick start
 
@@ -175,30 +176,54 @@ command per client and a verification step.
 ## What a call returns
 
 Verbatim output of `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")`,
-captured 2026-08-29 on core 0.1.7, truncated:
+captured 2026-10-17 with core 0.2.0, truncated:
 
 ```markdown
 ---
 title: "Messages"
 source: "https://platform.claude.com/docs/en/api/messages"
-captured_at: "2026-08-29T09:01:05.806Z"
+captured_at: "2026-10-17T20:35:21.487Z"
+language: "en"
+description: "API reference for Messages endpoints"
+canonical: "https://platform.claude.com/docs/en/api/messages"
+og_title: "Messages - Claude API Reference"
 extractor: "page2ai-core"
-extractor_version: "0.1.7"
-extractor_source: "content-negotiation"
+extractor_version: "0.2.0"
 ---
+
 # Messages
 
-## Create a Message
+Copy page
 
-**POST** `/v1/messages`
+
 
-Send a structured list of input messages with text and/or image content, and the
-model will generate the next message in the conversation.
+cURL 
+
+
+
+A beta version of this API exists and may have additional functionality. [View the beta version](https://platform.claude.com/docs/en/api/http/beta/messages).
+
+1. [API reference](https://platform.claude.com/docs/en/api/http)
+
+Copy page
+
+
+
+cURL 
+
+##### [Create a Message](https://platform.claude.com/docs/en/api/http/messages/create)
+
+ POST /v1/messages
+
+Send a structured list of input messages with text and/or image content, and the model will generate the next message in the conversation.
 ```
 
-YAML front matter (title, source, capture timestamp, extractor provenance), then the
-article as clean Markdown — headings, tables and fenced code preserved, navigation and
-chrome dropped.
+YAML front matter (title, source, capture timestamp, page metadata, extractor provenance),
+then the page as Markdown: headings, tables and fenced code preserved; navigation, header,
+footer and sidebars dropped. Buttons inside the article come through as text (here «Copy
+page», with the glyph of its icon, and «cURL»). Up to 0.2.8 this URL returned the site's own
+Markdown copy (`extractor_source: "content-negotiation"`); since 0.3.0 the server reads only
+the page.
 
 ## Configuration
 
@@ -315,7 +340,7 @@ MIT — see [LICENSE](./LICENSE). Copyright © 2026 Igor Saevets.
 
 ## Related
 
-- **Page2AI Chrome extension** — https://github.com/igorsaevets/page2ai-extension (same extraction core, distributed as a browser extension for humans)
-- **@page2ai/core** — https://npmjs.com/package/@page2ai/core (the shared extraction library)
+- **Page2AI Chrome extension** — https://github.com/igorsaevets/page2ai-extension (a browser extension for humans, with its own extraction pipeline)
+- **@page2ai/core** — https://npmjs.com/package/@page2ai/core (the extraction library this server runs)
 - **page2ai-mcp** (unscoped) — https://npmjs.com/package/page2ai-mcp (thin wrapper around this package, published so `npx -y page2ai-mcp` works without a scope prefix)
 - **Software Heritage archive** — SWHID `swh:1:snp:05123c51ef9e7c0aeb06f42b1263c07a8d26999a`
