@@ -5,7 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
-## Unreleased
+## 0.2.8 - 2026-10-16
+
+### Changed
+- **`@page2ai/core` 0.1.13**, and the dependency range starts there (`^0.1.13`, was `^0.1.12`).
+  What `page_to_markdown` returns changes on some pages (core CHANGELOG, 0.1.13):
+  - a page streamed by React (Next.js App Router, Remix, Mintlify) returns its article instead
+    of the `Loading...` fallback (Anthropic's extended-thinking docs gave 212 characters of
+    `Loading...` for a 12,270-character article);
+  - hidden text no longer reaches the agent through code, link names or a hidden `<main>`;
+  - cells that span columns or rows no longer push later cells out from under their headers, a
+    `<br>` in code breaks the line (every Docusaurus code block printed as one line), and an
+    image in a table cell is written as its alt text;
+  - `include_frontmatter: false` is honoured on docs sites that serve a `.md` twin or answer
+    `text/markdown`; both paths added the frontmatter whatever the option said.
+- Lockfile: of what the server runs, only `@page2ai/core` moves (0.1.12 to 0.1.13);
+  `@modelcontextprotocol/server` and `/core` stay 2.3.1, `zod` 4.5.4, `linkedom` 0.18.13. The lock
+  decides what the MCPB bundle carries. In the test tooling `source-map-js` moves from 1.2.1 to
+  1.2.2 (GHSA-68fv-2mgg-jv7q, a denial of service through indexed source-map offsets; it came in
+  through vitest, vite and postcss and was never in the published package).
 
 ### Fixed
 - **What the server says about itself now matches what it does.** `server.json` (shown by the MCP
