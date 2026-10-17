@@ -1,7 +1,8 @@
 // page_to_markdown tool: fetches a URL and returns clean Markdown for LLM context.
 // Uses @page2ai/core under the hood — inherits SSRF protection, 10MB size cap,
-// 15s AbortController timeout, `.md`-first attempt (Mintlify convention), and
-// static tab discovery (emits `### Tab: {label}` sections for docs sites).
+// 15s AbortController timeout, the page-only fetch (no `.md` twin, a browser's
+// Accept header; core 0.2.0, BL-49), and static tab discovery (emits
+// `### Tab: {label}` sections for docs sites).
 
 import { fetchAndConvert, SsrfBlockedError, FetchProtectionError } from '@page2ai/core';
 import type { CallToolResult } from '@modelcontextprotocol/server';
@@ -36,8 +37,9 @@ export const pageToMarkdownDefinition = {
     'main content and drops navigation, headers, footers, and sidebars. It fetches without ' +
     'cookies and runs no page scripts, so a page behind a sign-in or one rendered only by ' +
     'JavaScript comes back as its login page or with no content; read those through a browser ' +
-    'tool instead. For Mintlify docs (docs.anthropic.com, OpenAI platform, ' +
-    'Vercel, Stripe, etc.) tries the `URL.md` convention first for cleanest output. ' +
+    'tool instead. It requests only the URL given, as a browser opens a page, so docs sites ' +
+    'return the page itself, not a Markdown copy of it; a URL that names a Markdown or text ' +
+    'file (a raw GitHub README.md, an llms.txt) comes back as written. ' +
     'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
     'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
     'Zero external API calls — parses locally via linkedom.',

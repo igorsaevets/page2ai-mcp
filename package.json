@@ -1,6 +1,6 @@
 {
   "name": "@page2ai/mcp",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "mcpName": "io.github.igorsaevets/page2ai-mcp",
   "description": "MCP server that converts any web page URL to clean Markdown for LLM context. Processing is local and SSRF-guarded; no external APIs, no telemetry.",
   "type": "module",
@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@page2ai/core": "^0.1.13",
+    "@page2ai/core": "^0.2.0",
     "zod": "^4.2.0"
   },
   "devDependencies": {

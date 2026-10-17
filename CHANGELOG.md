@@ -5,6 +5,43 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.3.0 - 2026-10-17
+
+### Changed (breaking)
+- **`@page2ai/core` 0.2.0: the server reads only the page you name** (BL-49), and the dependency
+  range starts there (`^0.2.0`, was `^0.1.13`). It no longer asks for `<url>.md` first, and its
+  Accept header is the one Firefox sends when it opens a page, so Fumadocs, Mintlify, Vercel,
+  Supabase, Cloudflare, Stripe and the Claude docs answer with the HTML page instead of their own
+  Markdown copy, which can be older than the page. Measured live on 2026-10-17 with core 0.1.13
+  (what 0.2.8 runs) against 0.2.0: on those seven platforms 0.2.8 returned the copy and 0.3.0
+  converts the page, 1,301 to 57,887 characters, with every heading and code block of the copy
+  except navigation lists and Cloudflare's JSON-LD (core CHANGELOG, 0.2.0). Content that Mintlify
+  shows only to agents (`<Visibility for="agents">`) is gone, and what the page shows people is
+  there, buttons inside the article included («Copy page», «cURL» on Mintlify, Vercel and the
+  Claude docs).
+- **Markdown sent for a page address is an error.** The request asks for HTML, so a server that
+  still answers `text/markdown` picked its copy by something else (User-Agent, a cache). The tool
+  returns `isError` with "Fetch failed: the server answered with Markdown ... for a page address",
+  where 0.2.8 returned the copy as the page.
+- `extractor_source` in the frontmatter is `markdown-response` for a Markdown or text file;
+  `md-suffix` and `content-negotiation` no longer occur.
+
+### Fixed
+- **A Markdown or text file comes back as written.** A URL that names a `.md`, `.markdown`,
+  `.mdown`, `.mkd`, `.mdx` or `.txt` file is returned as is whether the server sends
+  `text/markdown`, `text/x-markdown`, `text/plain` or `application/octet-stream`. In 0.2.8 a
+  `README.md` from raw.githubusercontent.com came out as one line from the middle of the file
+  (3,468 of 11,408 characters, no heading), and an `llms.txt` lost its line breaks.
+- **What the server says about itself matches the page-only fetch.** The tool description no
+  longer says it tries `URL.md` first, and the MCPB manifest no longer says it requests a `.md`
+  twin. PRIVACY.md said the server requests only the URLs you pass, while up to 0.2.8 it also
+  requested `<url>.md`; it now says so, and its source links point at this repository and core
+  instead of a directory of the extension's.
+- README: the extension converts pages with its own pipeline, not `@page2ai/core` (BACKLOG
+  BL-47), and the example output is a new capture on core 0.2.0.
+- Lockfile: of what the server runs, only `@page2ai/core` moves (0.1.13 to 0.2.0);
+  `@modelcontextprotocol/server` and `/core` stay 2.3.1, `zod` 4.5.4, `linkedom` 0.18.13.
+
 ## 0.2.8 - 2026-10-16
 
 ### Changed
