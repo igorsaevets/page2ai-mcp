@@ -28,6 +28,12 @@ jobs:
       # package.json declares engines.node ">=20", so 20 is a claim this repo makes
       # to every consumer. Testing only on the newest runtime would leave that claim
       # unverified; 24 is what publish.yml actually builds with.
+      #
+      # Vitest 5 declares Node ^22.12 || ^24 || >=26, so `npm ci` prints an EBADENGINE warning
+      # on the Node 20 leg. The leg stays: the same 8 tests run there as on 22 and 24 (checked
+      # 2026-10-18), and with the smoke step below it is what checks the claim above. Node 20
+      # reached end of life on 2026-04-30. If Vitest stops running on 20, decide on the Node
+      # floor of engines.node then; do not pin Vitest back to 4 to keep the leg green.
       matrix:
         node: [20, 22, 24]
 
