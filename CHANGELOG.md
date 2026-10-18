@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.3.2 - 2026-10-17
+
+### Fixed
+- **`@page2ai/core` 0.2.2: the review fix for 0.2.1's button rule** (P2A-019), and the dependency range starts there
+  (`^0.2.2`, was `^0.2.1`). A page with thousands of sibling buttons converts in tens of milliseconds again (core
+  0.2.1 took 1.0 to 5.7 s for 3,000 sibling buttons, measured on 2026-10-18), and the page text 0.2.1 left out
+  comes back: an accordion's question with neither `aria-expanded` nor a heading (the session titles of a
+  W3Schools-style accordion), a definition
+  term, a question under `role="heading"`, a link written inside a button, and a command whose button is named «Copy
+  command: <command>» (core CHANGELOG, 0.2.2). The range moves for the reason given under 0.3.1: measured again on
+  2026-10-18, with core 0.2.2 out, an `npx` cache filled before it still ran `page2ai-mcp` 0.3.1 on core 0.2.1, and an
+  empty cache ran core 0.2.2.
+- README: the example output stays as captured on core 0.2.1: on 2026-10-18 core 0.2.2 converted that page byte for
+  byte as 0.2.1 did, without the front matter.
+
 ## 0.3.1 - 2026-10-17
 
 ### Fixed
