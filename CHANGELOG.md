@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.3.1 - 2026-10-17
+
+### Fixed
+- **`@page2ai/core` 0.2.1: interface buttons no longer print as text** (P2A-019), and the dependency range starts
+  there (`^0.2.1`, was `^0.2.0`). The header's «Copy page» with the glyph of its icon and the code-sample switcher
+  («cURL …») of Mintlify, Vercel and Claude docs pages are gone from the tool's output; buttons that hold the page's
+  own text stay (an accordion's question, a table column's name, a word of a sentence: core CHANGELOG, 0.2.1).
+  The range moves because `npx` reuses a cached install while the server's own version stays the same: measured on
+  2026-10-18 with an npx cache filled before core 0.2.1 came out, `npx -y page2ai-mcp` (0.3.0) still ran core
+  0.2.0 after the release, and a cold cache ran 0.2.1.
+- README: the example output is a new capture on core 0.2.1, without the buttons.
+
 ## 0.3.0 - 2026-10-17
 
 ### Changed (breaking)
