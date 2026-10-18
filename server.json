@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/igorsaevets/page2ai-mcp#readme",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@page2ai/mcp",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "transport": {
         "type": "stdio"
       }
