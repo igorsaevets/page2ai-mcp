@@ -176,40 +176,28 @@ command per client and a verification step.
 ## What a call returns
 
 Verbatim output of `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")`,
-captured 2026-10-17 with core 0.2.0, truncated:
+captured 2026-10-18 with core 0.2.1, truncated:
 
 ```markdown
 ---
 title: "Messages"
 source: "https://platform.claude.com/docs/en/api/messages"
-captured_at: "2026-10-17T20:35:21.487Z"
+captured_at: "2026-10-18T04:33:07.670Z"
 language: "en"
 description: "API reference for Messages endpoints"
 canonical: "https://platform.claude.com/docs/en/api/messages"
 og_title: "Messages - Claude API Reference"
 extractor: "page2ai-core"
-extractor_version: "0.2.0"
+extractor_version: "0.2.1"
 ---
 
 # Messages
-
-Copy page
-
-
-
-cURL 
 
 
 
 A beta version of this API exists and may have additional functionality. [View the beta version](https://platform.claude.com/docs/en/api/http/beta/messages).
 
 1. [API reference](https://platform.claude.com/docs/en/api/http)
-
-Copy page
-
-
-
-cURL 
 
 ##### [Create a Message](https://platform.claude.com/docs/en/api/http/messages/create)
 
@@ -220,8 +208,8 @@ Send a structured list of input messages with text and/or image content, and the
 
 YAML front matter (title, source, capture timestamp, page metadata, extractor provenance),
 then the page as Markdown: headings, tables and fenced code preserved; navigation, header,
-footer and sidebars dropped. Buttons inside the article come through as text (here «Copy
-page», with the glyph of its icon, and «cURL»). Up to 0.2.8 this URL returned the site's own
+footer and sidebars dropped. Interface buttons are left out (core 0.2.1); up to 0.3.0 this page also printed «Copy page»
+(with the glyph of its icon) and the «cURL» code-sample switcher, each twice. Up to 0.2.8 this URL returned the site's own
 Markdown copy (`extractor_source: "content-negotiation"`); since 0.3.0 the server reads only
 the page.
 
