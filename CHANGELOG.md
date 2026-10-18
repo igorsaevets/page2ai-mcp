@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.4.0 - 2026-10-18
+
+### Security
+- **`@page2ai/core` 0.3.0: SSRF guard hardening (BL-22).** DNS pinning closes the rebinding
+  window where `fetch()` could re-resolve a hostname to an internal address between the guard's
+  check and the connect. Extended blocklists cover multicast, broadcast, TEST-NET, NAT64, 6to4,
+  Teredo, documentation and discard IPv6 ranges. `undici` added as a transitive dependency through
+  core (zero transitive deps of its own). Core engines raised from >=18.0 to >=18.17 (mcp stays
+  >=20.0, unaffected).
+
 ## 0.3.2 - 2026-10-17
 
 ### Fixed
