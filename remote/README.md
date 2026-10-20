@@ -52,9 +52,12 @@ Production endpoint: **https://page2ai-mcp-remote.vercel.app/api/mcp**
 
 Deployed as a separate Vercel project (`page2ai-mcp-remote`) with root
 directory `remote/`. `vercel.json` sets `maxDuration: 30` — the hosted variant
-deliberately caps wall-clock below the tool's `timeout_ms` maximum (60 s), so
-requests asking for >25 s fetches may be cut by the platform; the default 15 s
-is unaffected. Abuse posture: platform WAF rate-limit rule (60 req/60 s per IP
+deliberately caps wall-clock below the tool's `timeout_ms` maximum (60 s). To
+answer inside that window, `api/mcp.ts` clamps `timeout_ms` to 20 s, and a
+clamped timeout says so in its error text; before that, a longer fetch was cut
+by the platform mid-stream with no result at all. The default 15 s is
+unaffected. `node scripts/smoke-remote.mjs <url> --slow` checks the clamp (about
+20 s, uses httpbin.org). Abuse posture: platform WAF rate-limit rule (60 req/60 s per IP
 → deny on `/api/mcp`) + per-IP and per-instance limits in code (x-real-ip
 keyed), private-range/metadata fetches blocked by the core SSRF guard, 10 MB
 response cap, `cache-control: no-store` on API responses.
