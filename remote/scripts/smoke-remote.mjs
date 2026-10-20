@@ -3,11 +3,14 @@
 // Speaks raw JSON-RPC over fetch — no SDK dependency — so it verifies the wire
 // format an arbitrary client sees, not what our own libraries would negotiate.
 //
-// Usage: node scripts/smoke-remote.mjs [endpointUrl]
+// Usage: node scripts/smoke-remote.mjs [endpointUrl] [--slow]
 //   default endpoint: http://localhost:3999/api/mcp
+//   --slow: also check the hosted timeout clamp (about 20 s more, uses httpbin.org)
 import assert from 'node:assert';
 
-const ENDPOINT = process.argv[2] ?? 'http://localhost:3999/api/mcp';
+const cliArgs = process.argv.slice(2);
+const SLOW = cliArgs.includes('--slow');
+const ENDPOINT = cliArgs.find((a) => !a.startsWith('--')) ?? 'http://localhost:3999/api/mcp';
 const CLIENT_PROTOCOL = '2026-07-28';
 
 let sessionId = null;
@@ -108,5 +111,29 @@ assert.ok(markdown.includes('# Example Domain'), `markdown missing H1: ${markdow
 const h1Count = (markdown.match(/^# /gm) ?? []).length;
 assert.strictEqual(h1Count, 1, `expected exactly 1 H1, got ${h1Count}`);
 console.log(`tools/call ok: ${markdown.length} chars, 1×H1`);
+
+// 5. --slow: a page whose headers arrive after 40 s, asked for with the schema's maximum
+//    timeout. The hosted variant must answer with its own clamped timeout error before the
+//    platform's 30 s stop; without the clamp the stream ended with no response (P2A-023).
+if (SLOW) {
+  const slowStart = Date.now();
+  const slow = await rpc('tools/call', {
+    name: 'page_to_markdown',
+    arguments: {
+      url: 'https://httpbin.org/drip?delay=40&duration=0&numbytes=1&code=200',
+      timeout_ms: 60000,
+    },
+  });
+  const slowText = slow.content?.find((c) => c.type === 'text')?.text ?? '';
+  const slowSecs = (Date.now() - slowStart) / 1000;
+  assert.ok(slow.isError, `slow call: expected isError, got ${slowText.slice(0, 200)}`);
+  assert.ok(slowText.startsWith('Fetch timed out after 20000ms'), `slow call: ${slowText.slice(0, 200)}`);
+  assert.ok(
+    slowText.includes('caps timeout_ms at 20000 (60000 was requested)'),
+    `slow call: no cap note: ${slowText.slice(0, 300)}`,
+  );
+  assert.ok(slowSecs < 28, `slow call took ${slowSecs.toFixed(1)}s, too close to the 30 s stop`);
+  console.log(`tools/call --slow ok: clamped timeout answered in ${slowSecs.toFixed(1)}s`);
+}
 
 console.log(`SMOKE PASS in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

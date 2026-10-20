@@ -44,6 +44,34 @@ function limited(ip: string): boolean {
   return entry.count > MAX_PER_IP;
 }
 
+// vercel.json stops this function at 30 s (maxDuration, cut from 90 on 2026-08-30 as the
+// cost cap, commit 31bd82f), while the shared tool schema accepts timeout_ms up to 60 000.
+// Unclamped, a slow page fetched with a long timeout outlived the function: the platform
+// ended the SSE stream with no JSON-RPC response, so the client got neither a result nor a
+// reason (P2A-023, reproduced 2026-10-19). Clamped, the fetch aborts first and the tool
+// answers with its own error. 20 s leaves 10 s for start-up and conversion: a 7.6 MB page
+// (tc39.es/ecma262) took 6.7 s end to end on this endpoint, and the size cap is 10 MB.
+const HOSTED_MAX_TIMEOUT_MS = 20_000;
+
+async function handleHosted(args: unknown) {
+  const parsed = pageToMarkdownInputSchema.safeParse(args);
+  // Invalid input goes through unchanged, so the tool's own validation error answers it.
+  if (!parsed.success || parsed.data.timeout_ms <= HOSTED_MAX_TIMEOUT_MS) {
+    return handlePageToMarkdown(args);
+  }
+  const requested = parsed.data.timeout_ms;
+  const result = await handlePageToMarkdown({ ...parsed.data, timeout_ms: HOSTED_MAX_TIMEOUT_MS });
+  const first = result.content[0];
+  if (result.isError && first?.type === 'text' && first.text.startsWith('Fetch timed out after')) {
+    const note =
+      ` This hosted endpoint caps timeout_ms at ${HOSTED_MAX_TIMEOUT_MS} (${requested} was requested)` +
+      ' because its platform stops every request at 30 s; the local server' +
+      ' (npx -y page2ai-mcp) accepts up to 60000.';
+    return { ...result, content: [{ ...first, text: first.text + note }, ...result.content.slice(1)] };
+  }
+  return result;
+}
+
 // mcp-handler v2 declares serverInfo as `{ name; version }` only, but the underlying
 // @modelcontextprotocol/server v2 Implementation schema also accepts title, description,
 // websiteUrl, and icons. Passing them through populates the `initialize` response that
@@ -52,7 +80,7 @@ function limited(ip: string): boolean {
 // evaluated at the wider inferred type, and the cast then narrows to the declared shape.
 const serverInfoWithMetadata = {
   name: 'page2ai-mcp-remote',
-  version: '0.1.0',
+  version: '0.1.1',
   title: 'Page2AI (hosted)',
   description:
     'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
@@ -71,7 +99,7 @@ const mcp = createMcpHandler(
         inputSchema: pageToMarkdownInputSchema,
         annotations: pageToMarkdownDefinition.annotations,
       },
-      async (args) => handlePageToMarkdown(args),
+      async (args) => handleHosted(args),
     );
   },
   {
