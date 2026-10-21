@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.4.1 - 2026-10-20
+
+### Fixed
+- **`@page2ai/core` 0.3.1: layout tables convert as blocks, not as one table cell** (P2A-024), and
+  the dependency range starts there (`^0.3.1`, was `^0.3.0`). An HTML e-mail or newsletter built
+  from nested `<table role="presentation">` came out as one Markdown table cell on one line, its
+  heading and paragraphs run together (the IronMemo letter, one 1,415-character cell holding its
+  `<h1>` and 14 paragraphs). Such a table now converts as the blocks in its cells, in source order;
+  a data table inside it stays a table. Images in a layout table keep the cell rule, so spacers and
+  open-tracking pixels (empty alt) add nothing. The range moves for the reason given in 0.3.1: with
+  a warm npx cache `page2ai-mcp` 0.4.0 still ran core 0.3.0.
+- **`@page2ai/mcp` 0.4.0, P2A-023: the hosted endpoint clamps `timeout_ms`** to 20 s under the
+  30 s Vercel function limit. A request with `timeout_ms` above 20 000 previously kept the
+  connection alive past the function's hard limit and returned only keepalive comments.
+- **SECURITY.md** no longer says the DNS-rebinding window is open (P2A-022). Core 0.3.0 closed it
+  with DNS pinning; the published SECURITY.md of 0.4.0 still described it as a known limitation.
+  Supported-versions table updated to 0.4.x.
+
 ## 0.4.0 - 2026-10-18
 
 ### Security
