@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## Unreleased
+
+### Fixed
+
+- **A refusing extension no longer breaks `page_to_markdown`.** With the Agent Bridge connected, any extension error was returned as the tool's answer. Now a refusal (no site access, a sign-in page, a non-web URL) or a failed tab falls back to the server's own fetch, as with no extension, and the answer says why; a bridge timeout is still an error, so the caller's time is not spent twice.
+- **A request no longer waits for its timeout when the extension disconnects**: it fails at once with `EXTENSION_DISCONNECTED`.
+
+### Security
+
+- **The bridge accepts Page2AI only**: its Chrome Web Store origin, any `moz-extension://` (Firefox gives each install a random UUID), and the exact origins in `PAGE2AI_BRIDGE_ORIGINS` (an unpacked build). Before, any installed extension could open the connection without a permission, read every URL the agent asked for and write what the agent read.
+
 ## 0.5.1 - 2026-10-22
 
 ### Fixed

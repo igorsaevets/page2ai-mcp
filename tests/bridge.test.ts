@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
-import { BridgeServer } from '../src/bridge/server.js';
+import { BridgeServer, PAGE2AI_CHROME_ORIGIN } from '../src/bridge/server.js';
 import { BRIDGE_PROTOCOL } from '../src/bridge/protocol.js';
 
 const TEST_PORT = 13025;
@@ -9,7 +9,7 @@ const log = (_msg: string): void => {};
 const connect = (port: number, origin?: string): Promise<WebSocket> =>
   new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
-      origin: origin ?? 'chrome-extension://test-extension-id',
+      origin: origin ?? PAGE2AI_CHROME_ORIGIN,
       headers: { host: `127.0.0.1:${port}` },
     });
     ws.on('open', () => resolve(ws));
@@ -51,6 +51,48 @@ describe('BridgeServer', () => {
     expect(msg.token).toBeTruthy();
     expect(server.isConnected()).toBe(true);
     ws.close();
+  });
+
+  it('rejects another Chrome extension (any installed extension can reach localhost)', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    await expect(connect(TEST_PORT, 'chrome-extension://aaaabbbbccccddddeeeeffffgggghhhh')).rejects.toThrow();
+    expect(server.isConnected()).toBe(false);
+  });
+
+  it('accepts a Firefox origin (random per-install UUID) and an extra origin from options', async () => {
+    server = new BridgeServer({
+      port: TEST_PORT, serverVersion: '0.0.1-test', log,
+      extraOrigins: ['chrome-extension://unpackedbuildid'],
+    });
+    await server.start();
+
+    for (const origin of ['moz-extension://0b7c3f0e-1111-4222-8333-944455556666', 'chrome-extension://unpackedbuildid']) {
+      const ws = await connect(TEST_PORT, origin);
+      ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
+      expect((await readMsg(ws)).type).toBe('welcome');
+      const closed = new Promise((r) => ws.once('close', r));
+      ws.close();
+      await closed;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  });
+
+  it('convert() rejects at once when the extension disconnects, not at its timeout', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    const ws = await connect(TEST_PORT);
+    ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
+    await readMsg(ws);
+    ws.once('message', () => ws.close()); // the convert request arrives; the extension goes away
+
+    const started = Date.now();
+    await expect(server.convert({
+      url: 'https://example.com/', includeImages: true, includeFrontmatter: true, timeoutMs: 30_000,
+    })).rejects.toThrow(/EXTENSION_DISCONNECTED/);
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
   it('rejects http:// Origin', async () => {
