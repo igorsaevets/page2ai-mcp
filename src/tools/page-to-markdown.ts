@@ -144,6 +144,11 @@ export const handlePageToMarkdown = async (
   const url = input.url!;
 
   // --- Path 2: extension bridge connected → route through the user's browser ---
+  // A refusal (no site access, a sensitive or non-web URL) or a failed tab falls
+  // through to the server's own fetch, as if no extension were connected, with a
+  // note saying why; a timeout does not, since the fetch would spend the caller's
+  // time a second time.
+  let bridgeNote: string | null = null;
   if (bridgeRef?.isConnected()) {
     try {
       const result = await bridgeRef.convert({
@@ -157,7 +162,9 @@ export const handlePageToMarkdown = async (
       };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      return errorResult(`Bridge conversion failed: ${msg}`);
+      if (/TIMEOUT|timed out/i.test(msg)) return errorResult(`Bridge conversion failed: ${msg}`);
+      process.stderr.write(`[page2ai-mcp] bridge: ${msg}; fetching without the browser\n`);
+      bridgeNote = `Fetched without the browser: the Page2AI extension answered ${msg}`;
     }
   }
 
@@ -169,19 +176,27 @@ export const handlePageToMarkdown = async (
       includeFrontmatter: input.include_frontmatter,
     });
     return {
-      content: [{ type: 'text' as const, text: result.markdown }],
+      content: [
+        { type: 'text' as const, text: result.markdown },
+        ...(bridgeNote ? [{ type: 'text' as const, text: bridgeNote }] : []),
+      ],
     };
   } catch (e: unknown) {
     if (e instanceof SsrfBlockedError) {
-      return errorResult(`URL blocked by SSRF guard: ${e.message}`);
+      return fetchError(`URL blocked by SSRF guard: ${e.message}`, bridgeNote);
     }
     if (e instanceof FetchProtectionError) {
-      return errorResult(`Fetch failed: ${e.message}`);
+      return fetchError(`Fetch failed: ${e.message}`, bridgeNote);
     }
     if (e instanceof Error && e.name === 'AbortError') {
-      return errorResult(`Fetch timed out after ${input.timeout_ms}ms: ${url}`);
+      return fetchError(`Fetch timed out after ${input.timeout_ms}ms: ${url}`, bridgeNote);
     }
     const msg = e instanceof Error ? e.message : String(e);
-    return errorResult(`Unexpected error: ${msg}`);
+    return fetchError(`Unexpected error: ${msg}`, bridgeNote);
   }
 };
+
+// A fetch error after a bridge refusal names both, so the agent can tell the
+// user what to change in the extension.
+const fetchError = (message: string, bridgeNote: string | null): PageToMarkdownResult =>
+  errorResult(bridgeNote ? `${message}\n${bridgeNote}` : message);

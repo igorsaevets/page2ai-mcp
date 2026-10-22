@@ -4,7 +4,8 @@
 //
 // Security model (BrowserTools MCP v2.0, post GHSA-xvrv-w8pg-f25f):
 //   1. Bind 127.0.0.1 only (never 0.0.0.0)
-//   2. Origin validation: accept chrome-extension:// and moz-extension:// only
+//   2. Origin validation: Page2AI's Chrome Web Store origin, any moz-extension://
+//      (Firefox gives each install a random UUID), and PAGE2AI_BRIDGE_ORIGINS
 //   3. Host header: must be 127.0.0.1:PORT or localhost:PORT
 //   4. Per-session token: generated on auth, required on every message
 
@@ -23,6 +24,10 @@ import {
   type ServerErrorMessage,
 } from './protocol.js';
 
+/** Page2AI's Chrome Web Store ID: Chrome, Edge and the other Chromium browsers
+ *  that install from the store send this Origin. */
+export const PAGE2AI_CHROME_ORIGIN = 'chrome-extension://dlpaaijcnbbmlfeohlphjpnbbcnomnno';
+
 type PendingRequest = {
   resolve: (result: BridgeConvertResult) => void;
   reject: (error: Error) => void;
@@ -39,11 +44,19 @@ export class BridgeServer {
   private readonly port: number;
   private readonly serverVersion: string;
   private readonly log: (msg: string) => void;
+  private readonly extraOrigins: readonly string[];
 
-  constructor(opts: { port?: number; serverVersion: string; log: (msg: string) => void }) {
+  constructor(opts: {
+    port?: number;
+    serverVersion: string;
+    log: (msg: string) => void;
+    /** Exact origins accepted beside the store's, e.g. an unpacked build's. */
+    extraOrigins?: readonly string[];
+  }) {
     this.port = opts.port ?? DEFAULT_BRIDGE_PORT;
     this.serverVersion = opts.serverVersion;
     this.log = opts.log;
+    this.extraOrigins = opts.extraOrigins ?? [];
   }
 
   isConnected(): boolean {
@@ -154,8 +167,14 @@ export class BridgeServer {
   }
 
   private verifyUpgrade(req: IncomingMessage): boolean {
+    // Page2AI only. Any installed extension may open a WebSocket to localhost
+    // without a permission, and the one holding this single connection reads
+    // every URL the agent asks for and writes what the agent then reads.
+    // Firefox origins are a random per-install UUID, so there only the scheme
+    // can be checked.
     const origin = req.headers.origin ?? '';
-    if (!origin.startsWith('chrome-extension://') && !origin.startsWith('moz-extension://')) {
+    if (origin !== PAGE2AI_CHROME_ORIGIN && !origin.startsWith('moz-extension://')
+      && !this.extraOrigins.includes(origin)) {
       this.log(`bridge: rejected Origin "${origin}"`);
       return false;
     }
@@ -268,6 +287,12 @@ export class BridgeServer {
         this.client = null;
         this.sessionToken = null;
         this.log('bridge: extension disconnected');
+        // Its requests can no longer be answered: fail them now, not at their timeout.
+        for (const [id, req] of this.pending) {
+          clearTimeout(req.timer);
+          req.reject(new Error('EXTENSION_DISCONNECTED: the extension closed the connection'));
+          this.pending.delete(id);
+        }
       }
     });
 

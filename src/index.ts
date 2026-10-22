@@ -102,7 +102,11 @@ let bridge: BridgeServer | null = null;
 
 if (!isServerless) {
   const bridgePort = parseInt(process.env.PAGE2AI_BRIDGE_PORT ?? '', 10) || DEFAULT_BRIDGE_PORT;
-  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log });
+  // An unpacked or self-built extension has its own ID: list its exact origin(s),
+  // comma-separated, e.g. PAGE2AI_BRIDGE_ORIGINS=chrome-extension://<id>.
+  const extraOrigins = (process.env.PAGE2AI_BRIDGE_ORIGINS ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log, extraOrigins });
   setBridge(bridge);
 
   bridge.start().then(
