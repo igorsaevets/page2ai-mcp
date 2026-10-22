@@ -214,4 +214,15 @@ describe('BridgeServer', () => {
       timeoutMs: 5000,
     })).rejects.toThrow('not connected');
   });
+
+  it('start() rejects cleanly when the port is already in use (regression: 0.5.0 crashed with unhandled EADDRINUSE on a second MCP instance)', async () => {
+    const sharedPort = TEST_PORT + 7;
+    server = new BridgeServer({ port: sharedPort, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    const second = new BridgeServer({ port: sharedPort, serverVersion: '0.0.1-test', log });
+    await expect(second.start()).rejects.toThrow(/EADDRINUSE|address already in use/i);
+    // If we got here, the process did not crash. The first server stays usable.
+    expect(server.isConnected()).toBe(false);
+  });
 });

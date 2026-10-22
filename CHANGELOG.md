@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.5.1 - 2026-10-22
+
+### Fixed
+- **Agent Bridge no longer crashes on `EADDRINUSE` when another MCP instance holds port 3025.**
+  In 0.5.0 the bridge attached a `WebSocketServer` to the HTTP server before `listen()` was called;
+  on a second `page2ai-mcp` instance (e.g. a user running the MCP in Claude Desktop and Cursor at
+  once) the listen failed with `EADDRINUSE`, `ws` re-emitted the error on the WSS, and the process
+  crashed with an unhandled `error` event. The server now binds the HTTP server first, attaches the
+  WSS only on success, logs `bridge failed to start: ... (the server continues without it)`, and
+  keeps serving stdio (fetch path). Regression test added.
+
+### Changed
+- **MCPB bundle excludes non-runtime files** (`src/`, `tests/`, `scripts/`, `remote/`, `wrapper/`,
+  `.github/`, docs, config files) via a new `.mcpbignore`. The 0.5.0 bundle was 33.6 MB packed /
+  115.8 MB unpacked / 3,874 files, because `remote/node_modules` and dev dependencies leaked in;
+  the 0.5.1 bundle targets ~3.7 MB packed / ~13 MB unpacked / ~1,500 files, back in line with
+  0.4.x. Build the bundle after `npm run build && npm prune --omit=dev`.
+
 ## 0.5.0 - 2026-10-22
 
 ### Added
