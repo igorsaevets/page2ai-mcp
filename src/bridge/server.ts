@@ -56,6 +56,29 @@ export class BridgeServer {
       res.end('WebSocket upgrade required');
     });
 
+    // Phase 1: bind the HTTP server. The WSS is attached only AFTER a
+    // successful listen so a listen error (EADDRINUSE when another MCP
+    // instance already runs on this host, same port) rejects cleanly.
+    // Attaching the WSS to a server that then fails to listen leaks the
+    // error through ws's internal `this._server.on('error', this.emit...)`,
+    // and nothing listens on wss.on('error') → the process crashes.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onError = (err: Error): void => {
+          this.httpServer!.off('error', onError);
+          reject(err);
+        };
+        this.httpServer!.once('error', onError);
+        this.httpServer!.listen(this.port, '127.0.0.1', () => {
+          this.httpServer!.off('error', onError);
+          resolve();
+        });
+      });
+    } catch (err) {
+      this.httpServer = null;
+      throw err;
+    }
+
     this.wss = new WebSocketServer({
       server: this.httpServer,
       verifyClient: (info, cb) => {
@@ -68,15 +91,16 @@ export class BridgeServer {
       },
     });
 
+    // Catch any wss-level error after startup (uncommon, but ws re-emits
+    // any underlying server error here). Individual connection errors are
+    // caught in handleConnection via ws.on('error').
+    this.wss.on('error', (err: Error) => {
+      this.log(`bridge wss error: ${err.message}`);
+    });
+
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
-    await new Promise<void>((resolve, reject) => {
-      this.httpServer!.on('error', reject);
-      this.httpServer!.listen(this.port, '127.0.0.1', () => {
-        this.log(`bridge listening on ws://127.0.0.1:${this.port}`);
-        resolve();
-      });
-    });
+    this.log(`bridge listening on ws://127.0.0.1:${this.port}`);
   }
 
   async stop(): Promise<void> {

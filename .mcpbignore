@@ -1,0 +1,43 @@
+# Exclude non-runtime files from the MCPB bundle.
+# The bundle ships `dist/` + runtime `node_modules` + metadata.
+# Before `mcpb pack`, run `npm prune --omit=dev` (or `npm ci --omit=dev`
+# after a separate build step) so dev dependencies are not bundled.
+
+# Source and tooling
+src/
+tests/
+scripts/
+tsconfig*.json
+.editorconfig
+
+# Companion packages (not shipped in the stdio MCPB)
+remote/
+wrapper/
+
+# Repo metadata not needed at runtime
+.github/
+.gitignore
+.mcp.json
+AGENTS.md
+CITATION.cff
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SUPPORT.md
+SECURITY.md
+glama.json
+llms-install.md
+agent-representations.json
+
+# Big icon, kept as asset ref in manifest.json via `icon.png` (small one)
+icon-400.png
+assets/
+
+# Build artifacts and local scratch
+coverage/
+*.log
+*.mcpb
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
