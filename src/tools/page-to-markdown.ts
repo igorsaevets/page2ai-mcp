@@ -4,13 +4,19 @@
 // Accept header; core 0.2.0, BL-49), and static tab discovery (emits
 // `### Tab: {label}` sections for docs sites).
 
-import { fetchAndConvert, SsrfBlockedError, FetchProtectionError } from '@page2ai/core';
+import { fetchAndConvert, htmlToMarkdown, SsrfBlockedError, FetchProtectionError } from '@page2ai/core';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import type { BridgeServer } from '../bridge/server.js';
 
 export const pageToMarkdownInputSchema = z.object({
-  url: z.string().url().describe(
-    'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints.',
+  url: z.string().url().optional().describe(
+    'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. Provide either `url` or `html`, not both.',
+  ),
+  html: z.string().max(10_000_000).optional().describe(
+    'Raw HTML string to convert to Markdown instead of fetching a URL. ' +
+    'Use this when you already have the page HTML from a browser tool. ' +
+    'Provide either `url` or `html`, not both. When both are absent, returns an error.',
   ),
   include_images: z.boolean().optional().default(true).describe(
     'Include image references (![alt](src)) in the output. Default: true.',
@@ -21,6 +27,10 @@ export const pageToMarkdownInputSchema = z.object({
   timeout_ms: z.number().int().min(1000).max(60000).optional().default(15000).describe(
     'Abort the fetch after N milliseconds. Range: 1000-60000. Default: 15000.',
   ),
+}).refine((data) => data.url || data.html, {
+  message: 'Provide either `url` or `html`.',
+}).refine((data) => !(data.url && data.html), {
+  message: 'Provide either `url` or `html`, not both.',
 });
 
 export type PageToMarkdownInput = z.infer<typeof pageToMarkdownInputSchema>;
@@ -32,16 +42,15 @@ export const pageToMarkdownDefinition = {
   name: 'page_to_markdown',
   title: 'Convert Page to Markdown',
   description:
-    'Fetch a web page URL and convert it to clean Markdown optimized for LLM context. ' +
+    'Convert a web page to clean Markdown optimized for LLM context. ' +
+    'Provide a `url` to fetch, or `html` if you already have the page HTML from a browser tool. ' +
+    'When the Page2AI browser extension is connected via Agent Bridge, the extension converts ' +
+    'the page in the user\'s real browser (with cookies and JavaScript) and returns extension-quality Markdown. ' +
+    'Without the bridge, `url` fetches without cookies and runs no page scripts, so a page behind ' +
+    'a sign-in comes back as its login page; read those through a browser tool and pass the HTML here. ' +
     'Preserves headings, code blocks (with language hints), links, and tables; keeps the ' +
-    'main content and drops navigation, headers, footers, and sidebars. It fetches without ' +
-    'cookies and runs no page scripts, so a page behind a sign-in or one rendered only by ' +
-    'JavaScript comes back as its login page or with no content; read those through a browser ' +
-    'tool instead. It requests only the URL given, as a browser opens a page, so docs sites ' +
-    'return the page itself, not a Markdown copy of it; a URL that names a Markdown or text ' +
-    'file (a raw GitHub README.md, an llms.txt) comes back as written. ' +
-    'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
-    'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
+    'main content and drops navigation, headers, footers, and sidebars. ' +
+    'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section. ' +
     'Zero external API calls — parses locally via linkedom.',
   inputSchema: {
     type: 'object' as const,
@@ -50,7 +59,13 @@ export const pageToMarkdownDefinition = {
         type: 'string' as const,
         format: 'uri',
         description:
-          'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints.',
+          'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. Provide either `url` or `html`.',
+      },
+      html: {
+        type: 'string' as const,
+        maxLength: 10_000_000,
+        description:
+          'Raw HTML string to convert to Markdown instead of fetching a URL. Use this when you already have the page HTML from a browser tool. Provide either `url` or `html`, not both.',
       },
       include_images: {
         type: 'boolean' as const,
@@ -71,7 +86,6 @@ export const pageToMarkdownDefinition = {
         description: 'Abort the fetch after N milliseconds. Range: 1000-60000.',
       },
     },
-    required: ['url'],
     additionalProperties: false,
   },
   annotations: {
@@ -89,6 +103,12 @@ const errorResult = (message: string): PageToMarkdownResult => ({
   content: [{ type: 'text' as const, text: message }],
 });
 
+let bridgeRef: BridgeServer | null = null;
+
+export const setBridge = (bridge: BridgeServer | null): void => {
+  bridgeRef = bridge;
+};
+
 export const handlePageToMarkdown = async (
   rawInput: unknown,
 ): Promise<PageToMarkdownResult> => {
@@ -103,8 +123,47 @@ export const handlePageToMarkdown = async (
     return errorResult(`Invalid input: ${msg}`);
   }
 
+  // --- Path 1: raw HTML provided → convert locally via htmlToMarkdown (mcp#1) ---
+  if (input.html) {
+    try {
+      const result = htmlToMarkdown(input.html, {
+        baseUrl: input.url,
+        includeImages: input.include_images,
+        includeFrontmatter: input.include_frontmatter,
+      });
+      return {
+        content: [{ type: 'text' as const, text: result.markdown }],
+      };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return errorResult(`HTML conversion failed: ${msg}`);
+    }
+  }
+
+  // url is guaranteed present here by the schema refinement (url || html required).
+  const url = input.url!;
+
+  // --- Path 2: extension bridge connected → route through the user's browser ---
+  if (bridgeRef?.isConnected()) {
+    try {
+      const result = await bridgeRef.convert({
+        url,
+        includeImages: input.include_images,
+        includeFrontmatter: input.include_frontmatter,
+        timeoutMs: input.timeout_ms,
+      });
+      return {
+        content: [{ type: 'text' as const, text: result.markdown }],
+      };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return errorResult(`Bridge conversion failed: ${msg}`);
+    }
+  }
+
+  // --- Path 3: fetch + linkedom (current behavior) ---
   try {
-    const result = await fetchAndConvert(input.url, {
+    const result = await fetchAndConvert(url, {
       timeoutMs: input.timeout_ms,
       includeImages: input.include_images,
       includeFrontmatter: input.include_frontmatter,
@@ -120,7 +179,7 @@ export const handlePageToMarkdown = async (
       return errorResult(`Fetch failed: ${e.message}`);
     }
     if (e instanceof Error && e.name === 'AbortError') {
-      return errorResult(`Fetch timed out after ${input.timeout_ms}ms: ${input.url}`);
+      return errorResult(`Fetch timed out after ${input.timeout_ms}ms: ${url}`);
     }
     const msg = e instanceof Error ? e.message : String(e);
     return errorResult(`Unexpected error: ${msg}`);
