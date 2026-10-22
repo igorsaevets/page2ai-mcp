@@ -5,6 +5,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.5.0 - 2026-10-22
+
+### Added
+- **Agent Bridge: localhost WebSocket server for the Page2AI browser extension.** When the
+  user enables "Agent Bridge" in the extension popup, `page_to_markdown` routes through the
+  user's real browser — cookies, JavaScript rendering and extension-quality extraction —
+  instead of a cookieless fetch. The bridge binds `127.0.0.1:3025` (override with
+  `PAGE2AI_BRIDGE_PORT`), validates the extension's `chrome-extension://` or
+  `moz-extension://` Origin, and authenticates with a per-session 32-byte token. Protocol:
+  `page2ai-bridge/1`. Skipped on serverless (Vercel, Lambda).
+- **`html` input parameter** (closes #1): pass raw HTML directly instead of fetching a URL.
+  Use it when you already have the page HTML from a browser tool; the server converts it
+  locally via `htmlToMarkdown` from `@page2ai/core`. Provide either `url` or `html`, not
+  both; when both are absent the tool returns an error.
+
+### Changed
+- **3-path routing for `page_to_markdown`:** (1) `html` parameter → local conversion,
+  (2) bridge connected → extension, (3) `url` → fetch. When the extension is connected,
+  a `url` request goes through the browser automatically; a `url` + `html` request is
+  rejected. The fetch path is unchanged from 0.4.1.
+- `ws` added as a production dependency (`^8.22.0`) for the bridge WebSocket server.
+- Tool description updated to mention the bridge and the `html` parameter.
+- MCPB manifest `long_description` updated to mention the bridge.
+
 ## 0.4.1 - 2026-10-20
 
 ### Fixed
