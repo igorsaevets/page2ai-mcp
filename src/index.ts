@@ -15,7 +15,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { Server } from '@modelcontextprotocol/server';
-import { handlePageToMarkdown, pageToMarkdownDefinition } from './tools/page-to-markdown.js';
+import { handlePageToMarkdown, pageToMarkdownDefinition, setBridge } from './tools/page-to-markdown.js';
+import { BridgeServer } from './bridge/server.js';
+import { DEFAULT_BRIDGE_PORT } from './bridge/protocol.js';
 
 const SERVER_NAME = 'page2ai-mcp';
 
@@ -91,11 +93,34 @@ const handle = serveStdio(buildServer, {
   onerror: (err) => log(`transport error: ${err.message}`),
 });
 
+// --- Agent Bridge: localhost WS for the Page2AI browser extension ---
+// Starts only in local mode (not on Vercel/serverless). The extension connects
+// when the user enables "Agent Bridge" in its popup. When connected, the
+// page_to_markdown tool routes through the user's real browser.
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+let bridge: BridgeServer | null = null;
+
+if (!isServerless) {
+  const bridgePort = parseInt(process.env.PAGE2AI_BRIDGE_PORT ?? '', 10) || DEFAULT_BRIDGE_PORT;
+  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log });
+  setBridge(bridge);
+
+  bridge.start().then(
+    () => log(`bridge ready on ws://127.0.0.1:${bridgePort}`),
+    (err: unknown) => {
+      log(`bridge failed to start: ${err instanceof Error ? err.message : String(err)} (the server continues without it)`);
+      bridge = null;
+      setBridge(null);
+    },
+  );
+}
+
 log(`server ${SERVER_VERSION} ready on stdio (tools: page_to_markdown)`);
 
 const shutdown = (signal: string): void => {
   log(`${signal} received, closing`);
-  handle.close().then(
+  const bridgeStop = bridge ? bridge.stop() : Promise.resolve();
+  Promise.all([handle.close(), bridgeStop]).then(
     () => process.exit(0),
     (err: unknown) => {
       log(`close failed: ${err instanceof Error ? err.message : String(err)}`);
