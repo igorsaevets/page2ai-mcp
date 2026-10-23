@@ -29,6 +29,14 @@ import {
  *  that install from the store send this Origin. */
 export const PAGE2AI_CHROME_ORIGIN = 'chrome-extension://dlpaaijcnbbmlfeohlphjpnbbcnomnno';
 
+const isWebUrl = (url: string): boolean => {
+  try {
+    return /^https?:$/.test(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+};
+
 type PendingRequest = {
   resolve: (result: BridgeConvertResult) => void;
   reject: (error: Error) => void;
@@ -123,15 +131,20 @@ export class BridgeServer {
       req.reject(new BridgeError('SHUTTING_DOWN', 'the bridge is shutting down'));
       this.pending.delete(id);
     }
-    this.client?.close();
+    // terminate(), not close(): a close handshake waits up to 30 s for a client that
+    // never answers (a hung extension, a program holding the slot), and the server
+    // waited with it after its client had closed stdin (0.5.3).
+    this.client?.terminate();
     this.client = null;
     this.sessionToken = null;
 
     if (this.wss) {
+      for (const socket of this.wss.clients) socket.terminate();
       this.wss.close();
       this.wss = null;
     }
     if (this.httpServer) {
+      this.httpServer.closeAllConnections();
       await new Promise<void>((resolve) => {
         this.httpServer!.close(() => resolve());
       });
@@ -173,8 +186,8 @@ export class BridgeServer {
     // every URL the agent asks for and writes what the agent then reads.
     // Firefox gives each install a random moz-extension:// UUID, so a scheme
     // check would admit every Firefox extension (0.5.0-0.5.2 did): a Firefox
-    // install is admitted only by its exact origin in PAGE2AI_BRIDGE_ORIGINS,
-    // which the Page2AI popup shows there.
+    // install is admitted only by its exact origin in PAGE2AI_BRIDGE_ORIGINS (its
+    // Internal UUID in about:debugging; the log line below names a refused one).
     const origin = req.headers.origin ?? '';
     if (origin !== PAGE2AI_CHROME_ORIGIN && !this.extraOrigins.includes(origin)) {
       const hint = origin.startsWith('moz-extension://')
@@ -265,10 +278,15 @@ export class BridgeServer {
         if (pending) {
           clearTimeout(pending.timer);
           this.pending.delete(msg.id);
-          // The agent gets this text as the page: a result without it is an
-          // extension fault, answered like any other refusal.
-          if (typeof msg.markdown !== 'string') {
+          // The agent gets this text as the page: a result without it, or from a page
+          // that is not a web address (Firefox reports an early about:blank complete),
+          // is an extension fault, answered like any other refusal. 0.5.3 passed "" on.
+          if (typeof msg.markdown !== 'string' || msg.markdown.trim() === '') {
             pending.reject(new BridgeError('BAD_RESULT', 'the extension sent a result without Markdown'));
+            return;
+          }
+          if (typeof msg.url !== 'string' || !isWebUrl(msg.url)) {
+            pending.reject(new BridgeError('BAD_RESULT', `the extension sent the text of ${JSON.stringify(msg.url ?? null)}, not of a web page`));
             return;
           }
           pending.resolve({

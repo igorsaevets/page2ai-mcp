@@ -126,6 +126,9 @@ const shutdown = (signal: string): void => {
   if (shuttingDown) return;
   shuttingDown = true;
   log(`${signal} received, closing`);
+  // Whatever still holds the event loop after this (a close that never completes),
+  // the process ends: its client has gone.
+  setTimeout(() => process.exit(0), 3000).unref();
   const bridgeStop = bridge ? bridge.stop() : Promise.resolve();
   Promise.all([handle.close(), bridgeStop]).then(
     () => process.exit(0),
