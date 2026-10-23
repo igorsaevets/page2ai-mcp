@@ -68,3 +68,8 @@ jobs:
         # and exits 0 even when the server does not exist, which would make this
         # step a green mark that proves nothing.
         run: node scripts/probe-protocol.mjs --assert node dist/index.js
+
+      - name: The built server exits when its client closes stdin
+        # Since 0.5.0 the Agent Bridge's listening socket kept it running after that,
+        # holding port 3025 against the client's next instance (fixed in 0.5.3).
+        run: node scripts/stdin-exit.mjs dist/index.js

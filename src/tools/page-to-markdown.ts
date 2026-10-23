@@ -8,6 +8,7 @@ import { fetchAndConvert, htmlToMarkdown, SsrfBlockedError, FetchProtectionError
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { BridgeServer } from '../bridge/server.js';
+import { BridgeError } from '../bridge/protocol.js';
 
 const URL_TEXT =
   'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. ' +
@@ -29,7 +30,7 @@ export const pageToMarkdownInputSchema = z.object({
   timeout_ms: z.number().int().min(1000).max(60000).optional().default(15000).describe(
     'Abort the fetch after N milliseconds. Range: 1000-60000. Default: 15000.',
   ),
-}).refine((data) => data.url || data.html, {
+}).refine((data) => data.url !== undefined || data.html !== undefined, {
   message: 'Provide `url`, `html`, or both.',
 });
 
@@ -167,10 +168,20 @@ export const handlePageToMarkdown = async (
     return errorResult(`Invalid input: ${msg}`);
   }
 
+  // zod's url() takes any scheme (javascript:, file:, data:). The fetch would refuse
+  // them, but as the base of `html` one would resolve links and fill `source` unchecked.
+  if (input.url !== undefined && !/^https?:$/.test(new URL(input.url).protocol)) {
+    return errorResult('Invalid input: url: only http:// and https:// addresses are accepted');
+  }
+
   // --- Path 1: raw HTML provided → convert locally via htmlToMarkdown (mcp#1) ---
   // A `url` given with it is the page's address, never fetched: relative links resolve
-  // against it and it fills the frontmatter's `source`.
-  if (input.html) {
+  // against it and it fills the frontmatter's `source`. An empty `html` is an error, not
+  // a reason to fetch `url` instead: the caller chose the HTML route (0.5.2 fetched on "").
+  if (input.html !== undefined) {
+    if (input.html.trim() === '') {
+      return errorResult('Invalid input: html: empty. Send the page\'s HTML, or leave html out to fetch url.');
+    }
     try {
       const result = htmlToMarkdown(input.html, {
         baseUrl: input.url,
@@ -178,7 +189,7 @@ export const handlePageToMarkdown = async (
         includeFrontmatter: input.include_frontmatter,
       });
       return {
-        content: [{ type: 'text' as const, text: result.markdown }],
+        content: [{ type: 'text' as const, text: markSuppliedHtml(result.markdown) }],
       };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -193,7 +204,8 @@ export const handlePageToMarkdown = async (
   // A refusal (no site access, a sensitive or non-web URL) or a failed tab falls
   // through to the server's own fetch, as if no extension were connected, with a
   // note saying why; a timeout does not, since the fetch would spend the caller's
-  // time a second time.
+  // time a second time. The protocol's code decides, never the message's wording
+  // (0.5.2 matched /timed out/, so a tab-load failure worded so was not retried).
   let bridgeNote: string | null = null;
   if (bridgeRef?.isConnected()) {
     try {
@@ -203,12 +215,18 @@ export const handlePageToMarkdown = async (
         includeFrontmatter: input.include_frontmatter,
         timeoutMs: input.timeout_ms,
       });
+      // A redirect to another host (a sign-in page, most often) is still a success
+      // for the browser; the agent is told which page it got.
+      const landed = hostOf(result.url);
+      const redirectNote = landed && landed !== hostOf(url)
+        ? [{ type: 'text' as const, text: `Opened in the browser, the page redirected to ${result.url}; the Markdown is of that page.` }]
+        : [];
       return {
-        content: [{ type: 'text' as const, text: result.markdown }],
+        content: [{ type: 'text' as const, text: result.markdown }, ...redirectNote],
       };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/TIMEOUT|timed out/i.test(msg)) return errorResult(`Bridge conversion failed: ${msg}`);
+      if (e instanceof BridgeError && e.code === 'TIMEOUT') return errorResult(`Bridge conversion failed: ${msg}`);
       process.stderr.write(`[page2ai-mcp] bridge: ${msg}; fetching without the browser\n`);
       bridgeNote = `Fetched without the browser: the Page2AI extension answered ${msg}`;
     }
@@ -246,3 +264,23 @@ export const handlePageToMarkdown = async (
 // user what to change in the extension.
 const fetchError = (message: string, bridgeNote: string | null): PageToMarkdownResult =>
   errorResult(bridgeNote ? `${message}\n${bridgeNote}` : message);
+
+const hostOf = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/\.$/, '').toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+// Markdown made from the caller's HTML names `url` as its source without having fetched
+// it, so the frontmatter says where the content came from: a copy saved beside fetched
+// pages must not pass for one (any caller can pair any HTML with any URL).
+const PROVENANCE_LINE = 'provenance: "HTML supplied by the caller; the source URL was not fetched"';
+
+export const markSuppliedHtml = (markdown: string): string => {
+  if (!markdown.startsWith('---\n')) return markdown;
+  const end = markdown.indexOf('\n---', 4);
+  if (end < 0) return markdown;
+  return `${markdown.slice(0, end)}\n${PROVENANCE_LINE}${markdown.slice(end)}`;
+};

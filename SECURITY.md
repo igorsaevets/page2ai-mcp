@@ -17,8 +17,8 @@ Only the latest minor release receives fixes.
 
 | Version | Supported |
 |---------|-----------|
-| 0.4.x   | yes       |
-| < 0.4   | no        |
+| 0.5.x   | yes       |
+| < 0.5   | no        |
 
 ## What this server does, so you know what counts as a bug
 
@@ -43,6 +43,17 @@ guard resolves DNS once, validates every returned address, and pins the TCP conn
 addresses via an undici `Agent`, so `fetch()` cannot re-resolve the hostname to a different IP.
 Extended blocklists cover multicast, broadcast, TEST-NET, NAT64, 6to4, Teredo, documentation and
 discard IPv6 ranges.
+
+## Agent Bridge (since 0.5.0)
+
+The server listens on `ws://127.0.0.1:3025` for the Page2AI browser extension, which can then open
+the pages the agent asks for in the user's own browser. It binds loopback only, accepts a `Host` of
+`127.0.0.1:<port>` or `localhost:<port>` only (DNS rebinding), and accepts the extension by its
+WebSocket `Origin`: Page2AI's Chrome Web Store ID, or an exact origin listed in
+`PAGE2AI_BRIDGE_ORIGINS` (0.5.0 to 0.5.2 accepted any `moz-extension://` origin, so any Firefox
+extension; fixed in 0.5.3). A web page or another browser extension cannot forge that origin;
+another program on the same computer can, so the bridge is no stronger than the local user account.
+In scope: a web page, a remote host, or another browser extension reaching the bridge.
 
 ## Extraction is not sanitization
 

@@ -168,17 +168,22 @@ The server fetches without cookies and runs no page scripts. For a page that nee
 
 - **Pass the HTML you already have** (from Playwright, Chrome DevTools MCP or another browser
   tool) as `html`, with the page's `url`: the HTML is converted, the URL is never fetched, and
-  relative links resolve against it.
+  relative links resolve against it. The frontmatter then carries `provenance: "HTML supplied by
+  the caller; the source URL was not fetched"`. An empty `html` is an error, not a fetch of `url`.
 - **Or turn on Agent Bridge** in the Page2AI extension (1.6.0 or later): popup → *Agent Bridge*
   switch → allow access to websites. While the extension is connected, `url` pages open in a
   background tab of your own browser, with its cookies and scripts, and come back as the
   extension's Markdown (its own output settings apply, not `include_images` /
   `include_frontmatter`). The extension refuses sign-in providers' pages and anything that is
   not http(s); a page it refuses is fetched by the server as usual, with a second text block
-  saying why. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts the
-  Page2AI extension alone (its Web Store ID); Firefox gives every extension a random origin
-  per install, so there it accepts any `moz-extension://` origin, which means any Firefox
-  extension you have installed could connect while the server runs.
+  saying why; when the browser ends on another host (a sign-in redirect), a second text block
+  names the page it got. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts
+  the Page2AI extension alone (its Web Store ID). Firefox gives each install a random origin, so
+  a Firefox install is accepted only by its exact origin listed in `PAGE2AI_BRIDGE_ORIGINS`
+  (Firefox shows it at `about:debugging#/runtime/this-firefox` as the extension's Internal UUID:
+  `moz-extension://<that UUID>`); 0.5.0 to 0.5.2 accepted any Firefox extension. The origin check
+  stops web pages and other browser extensions; another program on the same computer can claim
+  any origin, so the bridge is no stronger than your user account.
 
 ## Example prompts
 
@@ -251,7 +256,7 @@ Environment variables of the local server, both optional:
 | Variable | Default | Effect |
 |---|---|---|
 | `PAGE2AI_BRIDGE_PORT` | `3025` | Port of the Agent Bridge on 127.0.0.1. If it is taken (another running instance), the server starts without the bridge |
-| `PAGE2AI_BRIDGE_ORIGINS` | — | Extra extension origins the bridge accepts, comma-separated, e.g. `chrome-extension://<id>` of an unpacked build |
+| `PAGE2AI_BRIDGE_ORIGINS` | — | Exact extension origins the bridge accepts besides Page2AI's Web Store ID, comma-separated: a Firefox install's `moz-extension://<uuid>`, an unpacked build's `chrome-extension://<id>` |
 
 Planned: a `profile` argument (`auto | docs | marketing | research | dashboard | wordpress-marketing`).
 

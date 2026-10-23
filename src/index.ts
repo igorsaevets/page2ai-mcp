@@ -121,7 +121,10 @@ if (!isServerless) {
 
 log(`server ${SERVER_VERSION} ready on stdio (tools: page_to_markdown)`);
 
+let shuttingDown = false;
 const shutdown = (signal: string): void => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   log(`${signal} received, closing`);
   const bridgeStop = bridge ? bridge.stop() : Promise.resolve();
   Promise.all([handle.close(), bridgeStop]).then(
@@ -135,3 +138,8 @@ const shutdown = (signal: string): void => {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+// A client ends a stdio session by closing stdin (the MCP spec's first shutdown step).
+// The bridge's listening socket would keep this process alive after that, holding the
+// port against the client's next instance: 0.5.0-0.5.2 were still running 6 s later.
+process.stdin.once('end', () => shutdown('stdin closed'));
+process.stdin.once('close', () => shutdown('stdin closed'));

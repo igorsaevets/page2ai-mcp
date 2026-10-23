@@ -86,4 +86,40 @@ describe('page_to_markdown — html input (mcp#1)', () => {
     expect(result.isError).toBe(true);
     expect((result.content[0] as { text: string }).text).toMatch(/url.*html|Provide/i);
   });
+
+  // 0.5.2: "" was falsy and the url was fetched instead, " " was converted as a page.
+  // 127.0.0.1 is refused by the SSRF guard, so a fetch attempt would show in the text.
+  it('refuses an empty or blank html instead of fetching the url', async () => {
+    for (const html of ['', ' \n\t ']) {
+      const result = await handlePageToMarkdown({ url: 'http://127.0.0.1/never-fetched', html });
+      const text = (result.content[0] as { text: string }).text;
+      expect(result.isError).toBe(true);
+      expect(text).toContain('html: empty');
+      expect(text).not.toMatch(/SSRF/);
+    }
+  });
+
+  it('refuses a url that is not http(s), with html or without', async () => {
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'data:text/html,x', 'ftp://example.invalid/a']) {
+      expect(pageToMarkdownInputSchema.safeParse({ url }).success).toBe(true); // zod's url() takes them
+      for (const input of [{ url, html: '<p>x</p>' }, { url }]) {
+        const result = await handlePageToMarkdown(input);
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('only http:// and https://');
+      }
+    }
+  });
+
+  it('says in the frontmatter that the HTML came from the caller and the url was not fetched', async () => {
+    const html = '<html><head><title>Press</title></head><body><main><h1>Press</h1><p>Text</p></main></body></html>';
+    const result = await handlePageToMarkdown({ url: 'https://docs.example.invalid/press', html });
+    const text = (result.content[0] as { text: string }).text;
+    const frontmatter = text.slice(0, text.indexOf('\n---', 4));
+    expect(frontmatter).toContain('source: "https://docs.example.invalid/press"');
+    expect(frontmatter).toContain('provenance: "HTML supplied by the caller; the source URL was not fetched"');
+    expect(text.indexOf('provenance:')).toBeLessThan(text.indexOf('\n---', 4));
+
+    const bare = await handlePageToMarkdown({ url: 'https://docs.example.invalid/press', html, include_frontmatter: false });
+    expect((bare.content[0] as { text: string }).text).not.toContain('provenance');
+  });
 });

@@ -61,14 +61,28 @@ describe('BridgeServer', () => {
     expect(server.isConnected()).toBe(false);
   });
 
-  it('accepts a Firefox origin (random per-install UUID) and an extra origin from options', async () => {
+  // Firefox gives each install a random UUID, so any Firefox extension has a
+  // moz-extension:// origin: 0.5.0-0.5.2 admitted them all (T169).
+  const FIREFOX_PAGE2AI = 'moz-extension://0b7c3f0e-1111-4222-8333-944455556666';
+  const FIREFOX_OTHER = 'moz-extension://9f9f9f9f-aaaa-4bbb-8ccc-dddddddddddd';
+
+  it('rejects a Firefox origin that PAGE2AI_BRIDGE_ORIGINS does not list', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    await expect(connect(TEST_PORT, FIREFOX_PAGE2AI)).rejects.toThrow(/403/);
+    expect(server.isConnected()).toBe(false);
+  });
+
+  it('accepts exactly the listed origins: one Firefox install and an unpacked build, no other Firefox extension', async () => {
     server = new BridgeServer({
       port: TEST_PORT, serverVersion: '0.0.1-test', log,
-      extraOrigins: ['chrome-extension://unpackedbuildid'],
+      extraOrigins: [FIREFOX_PAGE2AI, 'chrome-extension://unpackedbuildid'],
     });
     await server.start();
 
-    for (const origin of ['moz-extension://0b7c3f0e-1111-4222-8333-944455556666', 'chrome-extension://unpackedbuildid']) {
+    await expect(connect(TEST_PORT, FIREFOX_OTHER)).rejects.toThrow(/403/);
+    for (const origin of [FIREFOX_PAGE2AI, 'chrome-extension://unpackedbuildid']) {
       const ws = await connect(TEST_PORT, origin);
       ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
       expect((await readMsg(ws)).type).toBe('welcome');
@@ -77,6 +91,29 @@ describe('BridgeServer', () => {
       await closed;
       await new Promise((r) => setTimeout(r, 20));
     }
+  });
+
+  it('refuses a result without Markdown as BAD_RESULT, and passes an error code through', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    const ws = await connect(TEST_PORT);
+    ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
+    const welcome = await readMsg(ws);
+    let n = 0;
+    ws.on('message', (data) => {
+      const req = JSON.parse(String(data));
+      if (req.type !== 'convert') return;
+      n += 1;
+      ws.send(JSON.stringify(n === 1
+        ? { type: 'result', id: req.id, token: welcome.token, title: 'no markdown', url: req.url }
+        : { type: 'error', id: req.id, token: welcome.token, code: 'TIMEOUT', message: 'Extraction timed out' }));
+    });
+
+    const opts = { url: 'https://example.com/', includeImages: true, includeFrontmatter: true, timeoutMs: 5000 };
+    await expect(server.convert(opts)).rejects.toMatchObject({ name: 'BridgeError', code: 'BAD_RESULT' });
+    await expect(server.convert(opts)).rejects.toMatchObject({ name: 'BridgeError', code: 'TIMEOUT' });
+    ws.close();
   });
 
   it('convert() rejects at once when the extension disconnects, not at its timeout', async () => {
