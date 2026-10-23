@@ -55,19 +55,35 @@ function limited(ip: string): boolean {
 // (tc39.es/ecma262) took 6.7 s end to end on this endpoint, and the size cap is 10 MB.
 const HOSTED_MAX_TIMEOUT_MS = 20_000;
 
-async function handleHosted(args: unknown) {
-  // The contract has no `html`, and parsing strips unknown keys: a caller who sent HTML
-  // would silently get a fetch of `url` instead. Refused here, in the handler, so the
-  // reviewed schema the plugin was approved with stays byte-identical.
-  if (args !== null && typeof args === 'object' && 'html' in args) {
-    return {
-      isError: true,
-      content: [{
-        type: 'text' as const,
-        text: 'Invalid input: html: this hosted endpoint takes `url` only. The local server (npx -y page2ai-mcp) converts HTML you pass.',
-      }],
-    };
+const HTML_REFUSAL =
+  'Invalid input: html: this hosted endpoint takes `url` only. The local server (npx -y page2ai-mcp) converts HTML you pass.';
+
+// The contract has no `html`, and the SDK parses tool arguments with it before any handler
+// runs, stripping unknown keys: an `html` never reaches handleHosted, and 0.1.2 answered such
+// a call with a fetch of `url` instead (a check inside the handler saw nothing, T170). So it is
+// refused on the raw JSON-RPC message, and the schema the plugin was approved with stays as it is.
+async function refuseHtml(req: Request): Promise<Response | null> {
+  if (req.method !== 'POST') return null;
+  let message: unknown;
+  try {
+    message = await req.clone().json();
+  } catch {
+    return null;
   }
+  const call = message as { id?: unknown; method?: unknown; params?: { arguments?: unknown } } | null;
+  const args = call?.params?.arguments;
+  if (call?.method !== 'tools/call' || args === null || typeof args !== 'object' || !('html' in args)) return null;
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      id: call.id ?? null,
+      result: { isError: true, content: [{ type: 'text', text: HTML_REFUSAL }] },
+    }),
+    { status: 200, headers: { 'content-type': 'application/json', ...CORS_HEADERS } },
+  );
+}
+
+async function handleHosted(args: unknown) {
   // Parsed against the hosted contract, so nothing outside it (an `html`) reaches the
   // shared handler, which would accept it.
   const parsed = pageToMarkdownHostedInputSchema.safeParse(args);
@@ -185,6 +201,8 @@ async function withLimit(req: Request): Promise<Response> {
       },
     );
   }
+  const refusal = await refuseHtml(req);
+  if (refusal) return refusal;
   const response = await mcp(req);
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
