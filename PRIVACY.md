@@ -1,6 +1,6 @@
 # Page2AI MCP Server — Privacy Policy
 
-**Last updated:** 2026-10-17
+**Last updated:** 2026-10-23
 **Applies to:** `@page2ai/mcp` npm package v0.1.0+
 
 ## What data this MCP server collects
@@ -31,7 +31,11 @@ The MCP client (Claude Desktop, Cursor, etc.) that invokes `@page2ai/mcp` may lo
 
 ## Authentication
 
-`@page2ai/mcp` has no authentication mechanism because it has no user accounts or state. It cannot access content behind login walls or authenticated sessions.
+`@page2ai/mcp` has no authentication mechanism because it has no user accounts or state. By itself it cannot access content behind login walls or authenticated sessions: it fetches without cookies.
+
+## Agent Bridge (since 0.5.0)
+
+The server also listens on `ws://127.0.0.1:3025`, on this computer only, for the Page2AI browser extension. When you turn on Agent Bridge in the extension, a page the agent asks for opens in a background tab of your own browser, with your cookies, so its Markdown can include content you are signed in to; that Markdown goes from the extension to this server over the local connection and from here to your MCP client, like any other result. Nothing goes to Page2AI's author or to any server of theirs. Turning the switch off ends it and removes the extension's site access.
 
 ## Source code and audit
 

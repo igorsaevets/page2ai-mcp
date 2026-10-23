@@ -8,7 +8,8 @@ npx -y page2ai-mcp
 ```
 
 That is all this package is. It contains a two-line entry point that imports the real server, and
-it pins the scoped package to an exact version so the two can never drift apart.
+each release depends on the scoped package of the same version or a later patch (`^x.y.z`), released
+together with it.
 
 Everything — the tools, the configuration, the privacy posture, the security notes — is documented
 in the scoped package and at **https://igorsaevets.github.io/page2ai-docs/**.

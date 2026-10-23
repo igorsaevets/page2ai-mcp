@@ -5,6 +5,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.5.3 - 2026-10-23
+
+### Security
+
+- **Agent Bridge no longer accepts every Firefox extension.** 0.5.0 to 0.5.2 accepted any `moz-extension://` origin, because Firefox gives each install a random one; any Firefox extension could then hold the bridge, read the URLs the agent asks for and write what the agent reads. A Firefox install is now accepted only by its exact origin listed in `PAGE2AI_BRIDGE_ORIGINS`, and the server's log names the variable when it refuses one.
+
+### Fixed
+
+- **The server exits when its client closes stdin.** Since 0.5.0 the bridge's listening socket kept the process running after that (0.5.2 was still running 6 s later), holding port 3025, so the client's next instance started without the bridge. CI now checks it (`scripts/stdin-exit.mjs`).
+- **An empty `html` is an error.** With a `url`, `html: ""` fetched the URL instead and a blank `html` converted to an empty page; both now answer `Invalid input: html: empty`.
+- **`url` must be http(s).** zod's `url()` accepted `javascript:`, `file:` and `data:` addresses; the fetch refused them, but as the base of `html` they resolved links and filled `source`.
+- **Bridge failures are classified by their protocol code**, not by words in the message: only `TIMEOUT` ends the call without the server's own fetch. 0.5.2 matched "timed out", so a tab that failed to load was not retried by fetch.
+- **A bridge result without Markdown** is refused (`BAD_RESULT`) and answered by the server's fetch instead of returning an empty text.
+
+### Changed
+
+- **Markdown made from caller-supplied HTML says so**: its frontmatter adds `provenance: "HTML supplied by the caller; the source URL was not fetched"`, so it does not pass for a fetch of `source`.
+- **Through Agent Bridge, a redirect to another host is reported** in a second text block naming the page the browser ended on (a sign-in page, most often).
+- PRIVACY.md describes Agent Bridge (pages open in the user's own browser; content stays on the machine and goes to the MCP client); SECURITY.md supports 0.5.x and states what the bridge's origin check does and does not stop.
+
+### Hosted endpoint (remote 0.1.3)
+
+- `html` with a `url` is refused instead of being dropped (the reviewed contract has no `html`, and parsing stripped it, so the caller got a fetch of `url`). The production smoke now also pins the whole `inputSchema` JSON, `title` and `annotations` as served on 2026-10-23.
+
 ## 0.5.2 - 2026-10-23
 
 ### Changed

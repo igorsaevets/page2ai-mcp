@@ -4,8 +4,8 @@
 //
 // Security model (BrowserTools MCP v2.0, post GHSA-xvrv-w8pg-f25f):
 //   1. Bind 127.0.0.1 only (never 0.0.0.0)
-//   2. Origin validation: Page2AI's Chrome Web Store origin, any moz-extension://
-//      (Firefox gives each install a random UUID), and PAGE2AI_BRIDGE_ORIGINS
+//   2. Origin validation: Page2AI's Chrome Web Store origin, and the exact origins
+//      in PAGE2AI_BRIDGE_ORIGINS (a Firefox install, an unpacked build)
 //   3. Host header: must be 127.0.0.1:PORT or localhost:PORT
 //   4. Per-session token: generated on auth, required on every message
 
@@ -14,6 +14,7 @@ import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   BRIDGE_PROTOCOL,
+  BridgeError,
   DEFAULT_BRIDGE_PORT,
   type BridgeConvertOptions,
   type BridgeConvertResult,
@@ -119,7 +120,7 @@ export class BridgeServer {
   async stop(): Promise<void> {
     for (const [id, req] of this.pending) {
       clearTimeout(req.timer);
-      req.reject(new Error('Bridge shutting down'));
+      req.reject(new BridgeError('SHUTTING_DOWN', 'the bridge is shutting down'));
       this.pending.delete(id);
     }
     this.client?.close();
@@ -140,7 +141,7 @@ export class BridgeServer {
 
   async convert(opts: BridgeConvertOptions): Promise<BridgeConvertResult> {
     if (!this.isConnected()) {
-      throw new Error('Extension not connected');
+      throw new BridgeError('NOT_CONNECTED', 'the extension is not connected');
     }
 
     const id = `req_${Date.now()}_${++this.requestCounter}`;
@@ -158,7 +159,7 @@ export class BridgeServer {
     return new Promise<BridgeConvertResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Bridge request timed out after ${opts.timeoutMs}ms`));
+        reject(new BridgeError('TIMEOUT', `Bridge request timed out after ${opts.timeoutMs}ms`));
       }, opts.timeoutMs + 5000);
 
       this.pending.set(id, { resolve, reject, timer });
@@ -170,12 +171,16 @@ export class BridgeServer {
     // Page2AI only. Any installed extension may open a WebSocket to localhost
     // without a permission, and the one holding this single connection reads
     // every URL the agent asks for and writes what the agent then reads.
-    // Firefox origins are a random per-install UUID, so there only the scheme
-    // can be checked.
+    // Firefox gives each install a random moz-extension:// UUID, so a scheme
+    // check would admit every Firefox extension (0.5.0-0.5.2 did): a Firefox
+    // install is admitted only by its exact origin in PAGE2AI_BRIDGE_ORIGINS,
+    // which the Page2AI popup shows there.
     const origin = req.headers.origin ?? '';
-    if (origin !== PAGE2AI_CHROME_ORIGIN && !origin.startsWith('moz-extension://')
-      && !this.extraOrigins.includes(origin)) {
-      this.log(`bridge: rejected Origin "${origin}"`);
+    if (origin !== PAGE2AI_CHROME_ORIGIN && !this.extraOrigins.includes(origin)) {
+      const hint = origin.startsWith('moz-extension://')
+        ? `; if this is Page2AI in Firefox, add PAGE2AI_BRIDGE_ORIGINS=${origin} to this server's environment`
+        : '';
+      this.log(`bridge: rejected Origin "${origin}"${hint}`);
       return false;
     }
 
@@ -260,11 +265,17 @@ export class BridgeServer {
         if (pending) {
           clearTimeout(pending.timer);
           this.pending.delete(msg.id);
+          // The agent gets this text as the page: a result without it is an
+          // extension fault, answered like any other refusal.
+          if (typeof msg.markdown !== 'string') {
+            pending.reject(new BridgeError('BAD_RESULT', 'the extension sent a result without Markdown'));
+            return;
+          }
           pending.resolve({
             markdown: msg.markdown,
-            title: msg.title,
-            url: msg.url,
-            charCount: msg.charCount,
+            title: typeof msg.title === 'string' ? msg.title : '',
+            url: typeof msg.url === 'string' ? msg.url : '',
+            charCount: msg.markdown.length,
           });
         }
         return;
@@ -275,7 +286,7 @@ export class BridgeServer {
         if (pending) {
           clearTimeout(pending.timer);
           this.pending.delete(msg.id);
-          pending.reject(new Error(`${msg.code}: ${msg.message}`));
+          pending.reject(new BridgeError(String(msg.code), String(msg.message)));
         }
         return;
       }
@@ -290,7 +301,7 @@ export class BridgeServer {
         // Its requests can no longer be answered: fail them now, not at their timeout.
         for (const [id, req] of this.pending) {
           clearTimeout(req.timer);
-          req.reject(new Error('EXTENSION_DISCONNECTED: the extension closed the connection'));
+          req.reject(new BridgeError('EXTENSION_DISCONNECTED', 'the extension closed the connection'));
           this.pending.delete(id);
         }
       }

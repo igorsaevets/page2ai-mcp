@@ -5,6 +5,18 @@
 export const BRIDGE_PROTOCOL = 'page2ai-bridge/1';
 export const DEFAULT_BRIDGE_PORT = 3025;
 
+/** A bridge failure with the protocol's code (TIMEOUT, PERMISSION_REQUIRED, ...).
+ *  Callers decide by `code`; the message is for people and may change. */
+export class BridgeError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(`${code}: ${message}`);
+    this.name = 'BridgeError';
+    this.code = code;
+  }
+}
+
 // --- Extension → Server ---
 
 export interface HelloMessage {
@@ -34,7 +46,9 @@ export interface ConvertErrorMessage {
   type: 'error';
   id: string;
   token: string;
-  code: 'TAB_LOAD_FAILED' | 'EXTRACTION_FAILED' | 'TIMEOUT' | 'RESTRICTED_URL';
+  // TIMEOUT means the caller's time is spent: the server answers it without a fetch.
+  // Every other code is a refusal, after which the server fetches the URL itself.
+  code: 'TAB_LOAD_FAILED' | 'EXTRACTION_FAILED' | 'TIMEOUT' | 'RESTRICTED_URL' | 'PERMISSION_REQUIRED';
   message: string;
 }
 
