@@ -9,28 +9,28 @@ import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { BridgeServer } from '../bridge/server.js';
 
+const URL_TEXT =
+  'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. ' +
+  'Given with `html`, it is not fetched: it names the page the HTML came from, and relative links resolve against it.';
+const HTML_TEXT =
+  'Raw HTML of the page to convert instead of fetching it, e.g. from a browser tool. ' +
+  'Pass the page\'s `url` with it so relative links resolve. Either `url` or `html` is required.';
+const BRIDGE_SETTINGS_TEXT = ' Through Agent Bridge the extension\'s own output settings apply instead.';
+
 export const pageToMarkdownInputSchema = z.object({
-  url: z.string().url().optional().describe(
-    'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. Provide either `url` or `html`, not both.',
-  ),
-  html: z.string().max(10_000_000).optional().describe(
-    'Raw HTML string to convert to Markdown instead of fetching a URL. ' +
-    'Use this when you already have the page HTML from a browser tool. ' +
-    'Provide either `url` or `html`, not both. When both are absent, returns an error.',
-  ),
+  url: z.string().url().optional().describe(URL_TEXT),
+  html: z.string().max(10_000_000).optional().describe(HTML_TEXT),
   include_images: z.boolean().optional().default(true).describe(
-    'Include image references (![alt](src)) in the output. Default: true.',
+    'Include image references (![alt](src)) in the output. Default: true.' + BRIDGE_SETTINGS_TEXT,
   ),
   include_frontmatter: z.boolean().optional().default(true).describe(
-    'Prepend a YAML frontmatter block with title, source URL, capture timestamp, language, description, and canonical URL. Default: true.',
+    'Prepend a YAML frontmatter block with title, source URL, capture timestamp, language, description, and canonical URL. Default: true.' + BRIDGE_SETTINGS_TEXT,
   ),
   timeout_ms: z.number().int().min(1000).max(60000).optional().default(15000).describe(
     'Abort the fetch after N milliseconds. Range: 1000-60000. Default: 15000.',
   ),
 }).refine((data) => data.url || data.html, {
-  message: 'Provide either `url` or `html`.',
-}).refine((data) => !(data.url && data.html), {
-  message: 'Provide either `url` or `html`, not both.',
+  message: 'Provide `url`, `html`, or both.',
 });
 
 export type PageToMarkdownInput = z.infer<typeof pageToMarkdownInputSchema>;
@@ -42,41 +42,46 @@ export const pageToMarkdownDefinition = {
   name: 'page_to_markdown',
   title: 'Convert Page to Markdown',
   description:
-    'Convert a web page to clean Markdown optimized for LLM context. ' +
-    'Provide a `url` to fetch, or `html` if you already have the page HTML from a browser tool. ' +
-    'When the Page2AI browser extension is connected via Agent Bridge, the extension converts ' +
-    'the page in the user\'s real browser (with cookies and JavaScript) and returns extension-quality Markdown. ' +
-    'Without the bridge, `url` fetches without cookies and runs no page scripts, so a page behind ' +
-    'a sign-in comes back as its login page; read those through a browser tool and pass the HTML here. ' +
+    'Fetch a web page URL and convert it to clean Markdown optimized for LLM context. ' +
     'Preserves headings, code blocks (with language hints), links, and tables; keeps the ' +
     'main content and drops navigation, headers, footers, and sidebars. ' +
-    'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section. ' +
-    'Zero external API calls — parses locally via linkedom.',
+    'It fetches without cookies and runs no page scripts, so a page behind a sign-in or one ' +
+    'rendered only by JavaScript comes back as its login page or with no content. For those, ' +
+    'pass the page HTML you already have from a browser tool as `html` (with its `url`, relative ' +
+    'links resolve and nothing is fetched), or ask the user to turn on Agent Bridge in the ' +
+    'Page2AI browser extension: while it is connected, `url` pages open in the user\'s own ' +
+    'browser with its cookies and scripts, and a page the extension declines is fetched by the ' +
+    'server, with a note saying why. ' +
+    'It requests only the URL given, as a browser opens a page, so docs sites return the page ' +
+    'itself, not a Markdown copy of it; a URL that names a Markdown or text file (a raw GitHub ' +
+    'README.md, an llms.txt) comes back as written. ' +
+    'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
+    'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
+    'Zero external API calls: pages are parsed locally (linkedom) or in the user\'s browser.',
   inputSchema: {
     type: 'object' as const,
     properties: {
       url: {
         type: 'string' as const,
         format: 'uri',
-        description:
-          'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints. Provide either `url` or `html`.',
+        description: URL_TEXT,
       },
       html: {
         type: 'string' as const,
         maxLength: 10_000_000,
-        description:
-          'Raw HTML string to convert to Markdown instead of fetching a URL. Use this when you already have the page HTML from a browser tool. Provide either `url` or `html`, not both.',
+        description: HTML_TEXT,
       },
       include_images: {
         type: 'boolean' as const,
         default: true,
-        description: 'Include image references (![alt](src)) in the output.',
+        description: 'Include image references (![alt](src)) in the output.' + BRIDGE_SETTINGS_TEXT,
       },
       include_frontmatter: {
         type: 'boolean' as const,
         default: true,
         description:
-          'Prepend a YAML frontmatter block with title, source URL, capture timestamp, language, description, and canonical URL.',
+          'Prepend a YAML frontmatter block with title, source URL, capture timestamp, language, description, and canonical URL.' +
+          BRIDGE_SETTINGS_TEXT,
       },
       timeout_ms: {
         type: 'integer' as const,
@@ -94,6 +99,45 @@ export const pageToMarkdownDefinition = {
     idempotentHint: false,   // the fetched page may change between calls
     destructiveHint: false,
   },
+};
+
+// The hosted endpoint (remote/) serves the contract OpenAI reviewed for the ChatGPT plugin
+// (approved 2026-09-11). OpenAI rescans the live server and, after its automated checks,
+// replaces a reviewed tool definition with the changed one, so editing these strings changes
+// what ChatGPT runs. They stay the 0.4.1 definition: a URL only (no `html`) and no Agent
+// Bridge, which a hosted server can never reach. tests/hosted-contract.test.ts pins them.
+export const pageToMarkdownHostedInputSchema = z.object({
+  url: z.string().url().describe(
+    'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints.',
+  ),
+  include_images: z.boolean().optional().default(true).describe(
+    'Include image references (![alt](src)) in the output. Default: true.',
+  ),
+  include_frontmatter: z.boolean().optional().default(true).describe(
+    'Prepend a YAML frontmatter block with title, source URL, capture timestamp, language, description, and canonical URL. Default: true.',
+  ),
+  timeout_ms: z.number().int().min(1000).max(60000).optional().default(15000).describe(
+    'Abort the fetch after N milliseconds. Range: 1000-60000. Default: 15000.',
+  ),
+});
+
+export const pageToMarkdownHostedDefinition = {
+  name: pageToMarkdownDefinition.name,
+  title: pageToMarkdownDefinition.title,
+  description:
+    'Fetch a web page URL and convert it to clean Markdown optimized for LLM context. ' +
+    'Preserves headings, code blocks (with language hints), links, and tables; keeps the ' +
+    'main content and drops navigation, headers, footers, and sidebars. ' +
+    'It fetches without cookies and runs no page scripts, so a page behind a sign-in or one ' +
+    'rendered only by JavaScript comes back as its login page or with no content; read those ' +
+    'through a browser tool instead. ' +
+    'It requests only the URL given, as a browser opens a page, so docs sites return the page ' +
+    'itself, not a Markdown copy of it; a URL that names a Markdown or text file (a raw GitHub ' +
+    'README.md, an llms.txt) comes back as written. ' +
+    'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
+    'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
+    'Zero external API calls — parses locally via linkedom.',
+  annotations: pageToMarkdownDefinition.annotations,
 };
 
 // Wraps a plain-text error into an MCP tool result with isError:true so the
@@ -124,6 +168,8 @@ export const handlePageToMarkdown = async (
   }
 
   // --- Path 1: raw HTML provided → convert locally via htmlToMarkdown (mcp#1) ---
+  // A `url` given with it is the page's address, never fetched: relative links resolve
+  // against it and it fills the frontmatter's `source`.
   if (input.html) {
     try {
       const result = htmlToMarkdown(input.html, {
