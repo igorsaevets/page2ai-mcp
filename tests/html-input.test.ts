@@ -122,4 +122,12 @@ describe('page_to_markdown — html input (mcp#1)', () => {
     const bare = await handlePageToMarkdown({ url: 'https://docs.example.invalid/press', html, include_frontmatter: false });
     expect((bare.content[0] as { text: string }).text).not.toContain('provenance');
   });
+
+  it('leaves the text alone without frontmatter when the page opens with <hr> (rendered as ---)', async () => {
+    const html = '<html><body><hr><h2>Part one</h2><p>a</p><hr><h2>Part two</h2><p>b</p></body></html>';
+    const result = await handlePageToMarkdown({ url: 'https://docs.example.invalid/parts', html, include_frontmatter: false });
+    const text = (result.content[0] as { text: string }).text;
+    expect(text.startsWith('---\n')).toBe(true);
+    expect(text).not.toContain('provenance');
+  });
 });

@@ -4,7 +4,15 @@
 // Accept header; core 0.2.0, BL-49), and static tab discovery (emits
 // `### Tab: {label}` sections for docs sites).
 
-import { fetchAndConvert, htmlToMarkdown, SsrfBlockedError, FetchProtectionError } from '@page2ai/core';
+import { lookup } from 'node:dns/promises';
+import {
+  fetchAndConvert,
+  htmlToMarkdown,
+  assertSafeUrl,
+  findIpBlockReason,
+  SsrfBlockedError,
+  FetchProtectionError,
+} from '@page2ai/core';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { BridgeServer } from '../bridge/server.js';
@@ -188,8 +196,13 @@ export const handlePageToMarkdown = async (
         includeImages: input.include_images,
         includeFrontmatter: input.include_frontmatter,
       });
+      // Only a frontmatter block can carry the line: without one, a page that opens
+      // with <hr> starts with `---` too, and 0.5.3 put the line into its text.
       return {
-        content: [{ type: 'text' as const, text: markSuppliedHtml(result.markdown) }],
+        content: [{
+          type: 'text' as const,
+          text: input.include_frontmatter ? markSuppliedHtml(result.markdown) : result.markdown,
+        }],
       };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -208,6 +221,8 @@ export const handlePageToMarkdown = async (
   // (0.5.2 matched /timed out/, so a tab-load failure worded so was not retried).
   let bridgeNote: string | null = null;
   if (bridgeRef?.isConnected()) {
+    const blocked = await bridgeBlock(url);
+    if (blocked) return errorResult(`URL blocked by SSRF guard: ${blocked.message}`);
     try {
       const result = await bridgeRef.convert({
         url,
@@ -215,10 +230,15 @@ export const handlePageToMarkdown = async (
         includeFrontmatter: input.include_frontmatter,
         timeoutMs: input.timeout_ms,
       });
-      // A redirect to another host (a sign-in page, most often) is still a success
-      // for the browser; the agent is told which page it got.
-      const landed = hostOf(result.url);
-      const redirectNote = landed && landed !== hostOf(url)
+      // The browser follows redirects before anyone sees them: a page it ended on at a
+      // blocked address is not handed to the agent.
+      const landedBlock = await bridgeBlock(result.url);
+      if (landedBlock) {
+        return errorResult(`URL blocked by SSRF guard: the page redirected to ${result.url}. ${landedBlock.message}`);
+      }
+      // A redirect (a sign-in page, most often) is still a success for the browser;
+      // the agent is told which page it got.
+      const redirectNote = pageOf(result.url) !== pageOf(url)
         ? [{ type: 'text' as const, text: `Opened in the browser, the page redirected to ${result.url}; the Markdown is of that page.` }]
         : [];
       return {
@@ -265,12 +285,41 @@ export const handlePageToMarkdown = async (
 const fetchError = (message: string, bridgeNote: string | null): PageToMarkdownResult =>
   errorResult(bridgeNote ? `${message}\n${bridgeNote}` : message);
 
-const hostOf = (url: string): string => {
+// The page a URL names, to tell a redirect from the same page: host, port and path,
+// without an http-to-https upgrade, a trailing slash, the query or the fragment. 0.5.3
+// compared hosts only, so a same-host sign-in page (`/doc` to `/login`) went unnoted.
+const pageOf = (url: string): string => {
   try {
-    return new URL(url).hostname.replace(/\.$/, '').toLowerCase();
+    const u = new URL(url);
+    return `${u.hostname.replace(/\.$/, '').toLowerCase()}:${u.port}${u.pathname.replace(/\/+$/, '')}`;
   } catch {
     return '';
   }
+};
+
+// The tool promises to block private, loopback and metadata addresses, and the server's
+// own fetch does; through the bridge the browser must not open them for the agent either
+// (0.5.0-0.5.3 sent them to the extension). A name this server cannot resolve still goes
+// to the browser, which may reach it through a proxy: only an address the guard names is
+// refused. A browser resolving a name differently (DNS rebinding) is not covered.
+const bridgeBlock = async (url: string): Promise<SsrfBlockedError | null> => {
+  let host: string;
+  try {
+    host = assertSafeUrl(url).hostname;
+  } catch (e) {
+    return e instanceof SsrfBlockedError ? e : new SsrfBlockedError(String(e), url);
+  }
+  let addresses: { address: string }[];
+  try {
+    addresses = await lookup(host, { all: true, verbatim: true });
+  } catch {
+    return null;
+  }
+  for (const { address } of addresses) {
+    const reason = findIpBlockReason(address);
+    if (reason) return new SsrfBlockedError(`hostname "${host}" resolves to blocked address ${address} (${reason})`, url);
+  }
+  return null;
 };
 
 // Markdown made from the caller's HTML names `url` as its source without having fetched

@@ -55,6 +55,13 @@ extension; fixed in 0.5.3). A web page or another browser extension cannot forge
 another program on the same computer can, so the bridge is no stronger than the local user account.
 In scope: a web page, a remote host, or another browser extension reaching the bridge.
 
+The SSRF guard applies through the bridge too (0.5.4; 0.5.0 to 0.5.3 sent private, loopback and
+metadata URLs to the extension): the URL is checked, DNS included, before the browser opens it, and
+a result whose final page is at a blocked address is refused. Two gaps remain, both in the browser's
+hands: it follows redirects itself, so a public page that redirects to a private address is requested
+before the server can refuse its text, and it resolves names itself, so a name this server cannot
+resolve is passed to it (it may reach the name through a proxy).
+
 ## Extraction is not sanitization
 
 🔴 **The Markdown this server returns is untrusted input, exactly as untrusted as the page it came

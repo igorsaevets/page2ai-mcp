@@ -116,6 +116,51 @@ describe('BridgeServer', () => {
     ws.close();
   });
 
+  it('refuses blank Markdown and the text of a page that is not a web address as BAD_RESULT (0.5.3 passed "" on as the page)', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    const ws = await connect(TEST_PORT);
+    ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
+    const welcome = await readMsg(ws);
+    // Firefox reports the new tab's about:blank complete before the page loads.
+    const answers: Record<string, unknown>[] = [
+      { markdown: '', url: 'https://example.com/' },
+      { markdown: ' \n\t', url: 'https://example.com/' },
+      { markdown: '# Page', url: 'about:blank' },
+      { markdown: '# Page' },
+    ];
+    let n = 0;
+    ws.on('message', (data) => {
+      const req = JSON.parse(String(data));
+      if (req.type !== 'convert') return;
+      ws.send(JSON.stringify({ type: 'result', id: req.id, token: welcome.token, title: 't', ...answers[n++] }));
+    });
+
+    const opts = { url: 'https://example.com/', includeImages: true, includeFrontmatter: true, timeoutMs: 5000 };
+    for (const answer of answers) {
+      await expect(server.convert(opts), JSON.stringify(answer)).rejects.toMatchObject({ name: 'BridgeError', code: 'BAD_RESULT' });
+    }
+    ws.close();
+  });
+
+  it('stop() does not wait for a client that never answers the close handshake', async () => {
+    server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
+    await server.start();
+
+    const ws = await connect(TEST_PORT);
+    ws.send(JSON.stringify({ type: 'hello', protocol: BRIDGE_PROTOCOL, extensionId: 'x', extensionVersion: '1' }));
+    await readMsg(ws);
+    // A hung extension: nothing more is read, so the server's close frame is never answered
+    // and a close handshake would wait out ws's 30 s timeout (0.5.3 did, after stdin closed).
+    (ws as unknown as { _socket: { pause(): void } })._socket.pause();
+
+    const started = Date.now();
+    await server.stop();
+    expect(Date.now() - started).toBeLessThan(2000);
+    ws.terminate();
+  }, 10_000);
+
   it('convert() rejects at once when the extension disconnects, not at its timeout', async () => {
     server = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log });
     await server.start();

@@ -176,8 +176,10 @@ The server fetches without cookies and runs no page scripts. For a page that nee
   extension's Markdown (its own output settings apply, not `include_images` /
   `include_frontmatter`). The extension refuses sign-in providers' pages and anything that is
   not http(s); a page it refuses is fetched by the server as usual, with a second text block
-  saying why; when the browser ends on another host (a sign-in redirect), a second text block
-  names the page it got. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts
+  saying why; when the browser ends on another page (a sign-in redirect), a second text block
+  names the page it got. Private, loopback and cloud metadata addresses are refused before the
+  browser opens them, as by the server's own fetch, and so is a page the browser was redirected
+  to at one. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts
   the Page2AI extension alone (its Web Store ID). Firefox gives each install a random origin, so
   a Firefox install is accepted only by its exact origin listed in `PAGE2AI_BRIDGE_ORIGINS`
   (Firefox shows it at `about:debugging#/runtime/this-firefox` as the extension's Internal UUID:

@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.5.4 - 2026-10-23
+
+### Security
+
+- **Agent Bridge keeps the SSRF guard.** The tool's description says private ranges, loopback and cloud metadata endpoints are blocked, and the server's own fetch blocks them; 0.5.0 to 0.5.3 sent such a URL to the extension, which opened it in the user's browser (`http://192.168.1.1/`, `http://169.254.169.254/…`, a name resolving to `10.x`). The server now checks the URL with the same guard, DNS included, before the browser opens it, and refuses a result whose page, after a redirect the browser followed, is at a blocked address. A name this server cannot resolve still goes to the browser, which may reach it through a proxy.
+
+### Fixed
+
+- **A blank bridge result, or one from a page that is not a web address, is refused** (`BAD_RESULT`) and answered by the server's fetch. 0.5.3 refused a missing `markdown` but returned `""` as the page, and Firefox reports a new tab's `about:blank` complete before the page loads.
+- **The server exits when stdin closes even while a client is connected that never answers.** 0.5.3 waited for the WebSocket close handshake, up to 30 s; `scripts/stdin-exit.mjs` now connects such a client first, and the process ends at most 3 s after stdin closes.
+- **No `provenance` line inside the text when frontmatter is off.** HTML that opens with `<hr>` renders as `---`, and 0.5.3 inserted the line into the page's text under `include_frontmatter: false`.
+
+### Changed
+
+- **A redirect on the same host is reported too**: a sign-in page at another path, or another port. An http-to-https upgrade, a trailing slash or a changed query is not.
+
 ## 0.5.3 - 2026-10-23
 
 ### Security
