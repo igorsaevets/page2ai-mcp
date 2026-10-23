@@ -3,9 +3,11 @@
 // endpoint inherits the same SSRF guard, 10MB size cap, timeout enforcement
 // and error mapping as the local stdio server — one source of truth.
 import { createMcpHandler } from 'mcp-handler';
+// The hosted definition is the contract the ChatGPT plugin was reviewed with (a URL only,
+// no Agent Bridge); the local server's own definition also takes `html` and names the bridge.
 import {
-  pageToMarkdownDefinition,
-  pageToMarkdownInputSchema,
+  pageToMarkdownHostedDefinition,
+  pageToMarkdownHostedInputSchema,
   handlePageToMarkdown,
 } from '@page2ai/mcp/dist/tools/page-to-markdown.js';
 
@@ -54,10 +56,15 @@ function limited(ip: string): boolean {
 const HOSTED_MAX_TIMEOUT_MS = 20_000;
 
 async function handleHosted(args: unknown) {
-  const parsed = pageToMarkdownInputSchema.safeParse(args);
-  // Invalid input goes through unchanged, so the tool's own validation error answers it.
-  if (!parsed.success || parsed.data.timeout_ms <= HOSTED_MAX_TIMEOUT_MS) {
-    return handlePageToMarkdown(args);
+  // Parsed against the hosted contract, so nothing outside it (an `html`) reaches the
+  // shared handler, which would accept it.
+  const parsed = pageToMarkdownHostedInputSchema.safeParse(args);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+    return { isError: true, content: [{ type: 'text' as const, text: `Invalid input: ${msg}` }] };
+  }
+  if (parsed.data.timeout_ms <= HOSTED_MAX_TIMEOUT_MS) {
+    return handlePageToMarkdown(parsed.data);
   }
   const requested = parsed.data.timeout_ms;
   const result = await handlePageToMarkdown({ ...parsed.data, timeout_ms: HOSTED_MAX_TIMEOUT_MS });
@@ -80,7 +87,7 @@ async function handleHosted(args: unknown) {
 // evaluated at the wider inferred type, and the cast then narrows to the declared shape.
 const serverInfoWithMetadata = {
   name: 'page2ai-mcp-remote',
-  version: '0.1.1',
+  version: '0.1.2',
   title: 'Page2AI (hosted)',
   description:
     'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
@@ -92,12 +99,12 @@ const serverInfoWithMetadata = {
 const mcp = createMcpHandler(
   (server) => {
     server.registerTool(
-      pageToMarkdownDefinition.name,
+      pageToMarkdownHostedDefinition.name,
       {
-        title: pageToMarkdownDefinition.title,
-        description: pageToMarkdownDefinition.description,
-        inputSchema: pageToMarkdownInputSchema,
-        annotations: pageToMarkdownDefinition.annotations,
+        title: pageToMarkdownHostedDefinition.title,
+        description: pageToMarkdownHostedDefinition.description,
+        inputSchema: pageToMarkdownHostedInputSchema,
+        annotations: pageToMarkdownHostedDefinition.annotations,
       },
       async (args) => handleHosted(args),
     );

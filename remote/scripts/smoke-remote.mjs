@@ -100,6 +100,20 @@ const names = (tools.tools ?? []).map((t) => t.name);
 assert.ok(names.includes('page_to_markdown'), `tools/list missing page_to_markdown: ${names}`);
 console.log(`tools/list ok: ${names.join(', ')}`);
 
+// 3b. the ChatGPT plugin runs whatever this endpoint lists: it must stay the reviewed
+// contract (description sha256 783d1e41f68e, 898 chars; url + three options).
+const ptm = tools.tools.find((t) => t.name === 'page_to_markdown');
+const { createHash } = await import('node:crypto');
+const descSha = createHash('sha256').update(ptm.description, 'utf8').digest('hex').slice(0, 12);
+assert.deepStrictEqual([descSha, ptm.description.length], ['783d1e41f68e', 898], 'description differs from the reviewed copy');
+assert.deepStrictEqual(Object.keys(ptm.inputSchema.properties ?? {}),
+  ['url', 'include_images', 'include_frontmatter', 'timeout_ms'], 'input properties differ from the reviewed contract');
+assert.deepStrictEqual(ptm.inputSchema.required, ['url'], 'url must stay required');
+console.log(`tools/list contract ok: description ${descSha}, properties url + 3`);
+const htmlOnly = await rpc('tools/call', { name: 'page_to_markdown', arguments: { html: '<p>x</p>' } }).catch((e) => ({ thrown: String(e) }));
+assert.ok(htmlOnly.thrown || htmlOnly.isError === true, `html without url must be refused here: ${JSON.stringify(htmlOnly).slice(0, 200)}`);
+console.log('html without url refused ok');
+
 // 4. tools/call on a stable public page
 const call = await rpc('tools/call', {
   name: 'page_to_markdown',
