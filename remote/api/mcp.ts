@@ -56,6 +56,18 @@ function limited(ip: string): boolean {
 const HOSTED_MAX_TIMEOUT_MS = 20_000;
 
 async function handleHosted(args: unknown) {
+  // The contract has no `html`, and parsing strips unknown keys: a caller who sent HTML
+  // would silently get a fetch of `url` instead. Refused here, in the handler, so the
+  // reviewed schema the plugin was approved with stays byte-identical.
+  if (args !== null && typeof args === 'object' && 'html' in args) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text' as const,
+        text: 'Invalid input: html: this hosted endpoint takes `url` only. The local server (npx -y page2ai-mcp) converts HTML you pass.',
+      }],
+    };
+  }
   // Parsed against the hosted contract, so nothing outside it (an `html`) reaches the
   // shared handler, which would accept it.
   const parsed = pageToMarkdownHostedInputSchema.safeParse(args);
@@ -87,7 +99,7 @@ async function handleHosted(args: unknown) {
 // evaluated at the wider inferred type, and the cast then narrows to the declared shape.
 const serverInfoWithMetadata = {
   name: 'page2ai-mcp-remote',
-  version: '0.1.2',
+  version: '0.1.3',
   title: 'Page2AI (hosted)',
   description:
     'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +

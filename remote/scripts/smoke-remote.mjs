@@ -109,10 +109,22 @@ assert.deepStrictEqual([descSha, ptm.description.length], ['783d1e41f68e', 898],
 assert.deepStrictEqual(Object.keys(ptm.inputSchema.properties ?? {}),
   ['url', 'include_images', 'include_frontmatter', 'timeout_ms'], 'input properties differ from the reviewed contract');
 assert.deepStrictEqual(ptm.inputSchema.required, ['url'], 'url must stay required');
-console.log(`tools/list contract ok: description ${descSha}, properties url + 3`);
+// The whole emitted schema too: a zod or SDK update in this lock can change it ($schema,
+// formats, defaults) with the keys intact. Pinned from production on 2026-10-23 (T170).
+const schemaSha = createHash('sha256').update(JSON.stringify(ptm.inputSchema), 'utf8').digest('hex').slice(0, 12);
+assert.strictEqual(schemaSha, '72f90bf32a4d', 'inputSchema JSON differs from the copy pinned on 2026-10-23');
+assert.strictEqual(ptm.title, 'Convert Page to Markdown', 'title differs');
+assert.deepStrictEqual(ptm.annotations,
+  { readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false }, 'annotations differ');
+console.log(`tools/list contract ok: description ${descSha}, inputSchema ${schemaSha}, properties url + 3`);
 const htmlOnly = await rpc('tools/call', { name: 'page_to_markdown', arguments: { html: '<p>x</p>' } }).catch((e) => ({ thrown: String(e) }));
 assert.ok(htmlOnly.thrown || htmlOnly.isError === true, `html without url must be refused here: ${JSON.stringify(htmlOnly).slice(0, 200)}`);
 console.log('html without url refused ok');
+// With a url, 0.1.2 stripped the html and fetched the url: a silent swap of the content.
+const htmlAndUrl = await rpc('tools/call', { name: 'page_to_markdown', arguments: { url: 'https://example.com/', html: '<p>x</p>' } }).catch((e) => ({ thrown: String(e) }));
+assert.ok(htmlAndUrl.thrown || (htmlAndUrl.isError === true && JSON.stringify(htmlAndUrl).includes('takes `url` only')),
+  `html with url must be refused here, not dropped: ${JSON.stringify(htmlAndUrl).slice(0, 200)}`);
+console.log('html with url refused ok');
 
 // 4. tools/call on a stable public page
 const call = await rpc('tools/call', {
