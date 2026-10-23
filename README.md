@@ -160,7 +160,25 @@ command per client and a verification step.
 
 | Tool | Description | Read-only | Example |
 |------|-------------|-----------|---------|
-| `page_to_markdown` | Fetch a web page URL and convert to clean Markdown | ✅ | `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")` |
+| `page_to_markdown` | Fetch a web page URL, or take its HTML, and convert to clean Markdown | ✅ | `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")` |
+
+### Pages behind a sign-in or rendered by JavaScript
+
+The server fetches without cookies and runs no page scripts. For a page that needs either:
+
+- **Pass the HTML you already have** (from Playwright, Chrome DevTools MCP or another browser
+  tool) as `html`, with the page's `url`: the HTML is converted, the URL is never fetched, and
+  relative links resolve against it.
+- **Or turn on Agent Bridge** in the Page2AI extension (1.6.0 or later): popup → *Agent Bridge*
+  switch → allow access to websites. While the extension is connected, `url` pages open in a
+  background tab of your own browser, with its cookies and scripts, and come back as the
+  extension's Markdown (its own output settings apply, not `include_images` /
+  `include_frontmatter`). The extension refuses sign-in providers' pages and anything that is
+  not http(s); a page it refuses is fetched by the server as usual, with a second text block
+  saying why. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts the
+  Page2AI extension alone (its Web Store ID); Firefox gives every extension a random origin
+  per install, so there it accepts any `moz-extension://` origin, which means any Firefox
+  extension you have installed could connect while the server runs.
 
 ## Example prompts
 
@@ -219,10 +237,21 @@ No setup required — every argument has a sensible default. `page_to_markdown` 
 
 | Argument | Type | Default | Effect |
 |---|---|---|---|
-| `url` | string, **required** | — | Absolute http(s) URL to convert. Private ranges, loopback and cloud metadata endpoints are blocked (SSRF guard) |
+| `url` | string | — | Absolute http(s) URL to convert. Private ranges, loopback and cloud metadata endpoints are blocked (SSRF guard). With `html`, not fetched: the base for relative links |
+| `html` | string (≤ 10 MB) | — | The page's HTML, converted instead of a fetch. `url` or `html` is required |
 | `include_images` | boolean | `true` | Keep `![alt](src)` image references in the output |
 | `include_frontmatter` | boolean | `true` | Prepend the YAML front matter block |
 | `timeout_ms` | integer | `15000` | Abort the fetch after N ms (1000–60000) |
+
+The hosted endpoint takes `url` only (the contract its ChatGPT plugin was reviewed with) and
+caps `timeout_ms` at 20000.
+
+Environment variables of the local server, both optional:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PAGE2AI_BRIDGE_PORT` | `3025` | Port of the Agent Bridge on 127.0.0.1. If it is taken (another running instance), the server starts without the bridge |
+| `PAGE2AI_BRIDGE_ORIGINS` | — | Extra extension origins the bridge accepts, comma-separated, e.g. `chrome-extension://<id>` of an unpacked build |
 
 Planned: a `profile` argument (`auto | docs | marketing | research | dashboard | wordpress-marketing`).
 
@@ -232,6 +261,10 @@ Planned: a `profile` argument (`auto | docs | marketing | research | dashboard |
 beyond the URLs you explicitly provide. Note that your AI client (Claude, ChatGPT, …)
 still sends the extracted Markdown to its own model provider under that client's privacy
 policy — that part is outside this server's control. See [PRIVACY.md](./PRIVACY.md) for details.
+
+With Agent Bridge on, the extension sends this server the URL's Markdown as your browser
+renders it, signed-in content included, over a WebSocket on 127.0.0.1; nothing else leaves
+the machine, but the Markdown then goes to your AI client like any other result.
 
 The optional **hosted endpoint** is different by nature: URLs you ask it to convert are
 fetched from a server operated by the author (deployed on Vercel), and Vercel keeps its

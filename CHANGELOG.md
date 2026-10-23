@@ -5,7 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
-## Unreleased
+## 0.5.2 - 2026-10-23
+
+### Changed
+
+- **`url` and `html` together**: the HTML is converted and the URL is its address, never fetched; relative links and image sources resolve against it, and it fills the frontmatter's `source`. Up to 0.5.1 the pair was refused, so links in HTML from a browser tool stayed relative.
+- **The tool description is accurate again.** 0.5.0 dropped the sentences saying the server reads only the page (no Markdown copy of a docs page) and why tab groups are split, and said a connected extension converts every page; it now says when Agent Bridge is used and that a page the extension declines is fetched by the server. Through the bridge the extension's own output settings apply, and `include_images` / `include_frontmatter` say so.
+- **The hosted endpoint keeps the tool contract reviewed for the ChatGPT plugin**: `pageToMarkdownHostedDefinition` and `pageToMarkdownHostedInputSchema` are the 0.4.1 definition (a URL only, no Agent Bridge, which a hosted server never reaches). 0.5.0 had changed what ChatGPT runs by changing the shared definition; a test now pins the hosted one.
 
 ### Fixed
 

@@ -16,13 +16,13 @@ describe('page_to_markdown — html input (mcp#1)', () => {
     expect(parsed.html).toBeUndefined();
   });
 
-  it('rejects when both url and html are provided', () => {
-    expect(() =>
-      pageToMarkdownInputSchema.parse({
-        url: 'https://example.com',
-        html: '<html><body>test</body></html>',
-      }),
-    ).toThrow();
+  it('accepts url and html together', () => {
+    const parsed = pageToMarkdownInputSchema.parse({
+      url: 'https://example.com',
+      html: '<html><body>test</body></html>',
+    });
+    expect(parsed.url).toBe('https://example.com');
+    expect(parsed.html).toContain('test');
   });
 
   it('rejects when neither url nor html is provided', () => {
@@ -39,14 +39,20 @@ describe('page_to_markdown — html input (mcp#1)', () => {
     expect(text).toContain('**test**');
   });
 
-  it('converts html with baseUrl for resolving relative links', async () => {
+  it('resolves relative links against the url given with html, and never fetches it', async () => {
+    // .invalid never resolves (RFC 2606): a fetch would answer an error, not this page.
     const result = await handlePageToMarkdown({
-      html: '<html><body><a href="/about">About</a></body></html>',
-      url: 'https://example.com',
+      html: '<html><head><title>Guide</title></head><body><main><h1>Guide</h1>' +
+        '<p>Read <a href="/about">About</a> and <a href="next">Next</a>.</p>' +
+        '<img src="img/a.png" alt="diagram"></main></body></html>',
+      url: 'https://docs.example.invalid/guide/start',
     });
-    // url + html together is rejected by the schema refine.
-    // So baseUrl must be passed differently. Let me check...
-    expect(result.isError).toBe(true);
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('[About](https://docs.example.invalid/about)');
+    expect(text).toContain('[Next](https://docs.example.invalid/guide/next)');
+    expect(text).toContain('![diagram](https://docs.example.invalid/guide/img/a.png)');
+    expect(text).toContain('source: "https://docs.example.invalid/guide/start"');
   });
 
   it('includes frontmatter by default on html input', async () => {
