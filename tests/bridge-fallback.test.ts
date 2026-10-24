@@ -159,3 +159,34 @@ describe('page_to_markdown keeps the SSRF guard in front of the browser', () => 
     expect(textOf(result)).not.toContain('# Signed in page');
   });
 });
+
+// A handshake the server refused leaves no connection: the tool takes its own fetch, and the
+// note the bridge keeps is the agent's only sign that the browser was meant to serve it (T180).
+describe('page_to_markdown after a refused handshake', () => {
+  afterEach(() => {
+    setBridge(null);
+    ownFetch.mockClear();
+  });
+  const NOTE = 'Fetched without the browser: the Page2AI extension tried to connect with a key this server does not hold.';
+  const refusedBridge = (note: string | null): BridgeServer =>
+    ({
+      isConnected: () => false,
+      refusalNote: () => note,
+      convert: async () => { throw new BridgeError('NOT_CONNECTED', 'the extension is not connected'); },
+    }) as unknown as BridgeServer;
+
+  it('fetches by itself and puts the refusal note after the Markdown', async () => {
+    setBridge(refusedBridge(NOTE));
+    const result = await handlePageToMarkdown({ url: URL_FETCH_REFUSES });
+    expect(result.isError).toBeFalsy();
+    expect(result.content[0]).toMatchObject({ type: 'text', text: FETCHED });
+    expect(textOf(result)).toContain(NOTE);
+  });
+
+  it('adds nothing when no extension was refused', async () => {
+    setBridge(refusedBridge(null));
+    const result = await handlePageToMarkdown({ url: URL_FETCH_REFUSES });
+    expect(result.content).toHaveLength(1);
+    expect(textOf(result)).toBe(FETCHED);
+  });
+});

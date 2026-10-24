@@ -87,6 +87,13 @@ const buildServer = (): Server => {
   return server;
 };
 
+// `npx -y page2ai-mcp --version` prints the version and exits, before anything listens:
+// the one way for a user or an agent to see which server a name-only install runs today.
+if (process.argv.slice(2).includes('--version')) {
+  process.stdout.write(`${SERVER_VERSION}\n`);
+  process.exit(0);
+}
+
 const handle = serveStdio(buildServer, {
   // 'serve' is the default and is stated here on purpose: rejecting the 2025
   // era would break every client still on an older SDK, which is most of them.

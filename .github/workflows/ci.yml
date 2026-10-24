@@ -73,3 +73,7 @@ jobs:
         # Since 0.5.0 the Agent Bridge's listening socket kept it running after that,
         # holding port 3025 against the client's next instance (fixed in 0.5.3).
         run: node scripts/stdin-exit.mjs dist/index.js
+
+      - name: The built server answers --version with its package version
+        # The one way to see which server a name-only npx install runs (T180).
+        run: test "$(timeout 10 node dist/index.js --version < /dev/null)" = "$(node -p "require('./package.json').version")"

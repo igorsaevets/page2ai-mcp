@@ -61,6 +61,12 @@ tell the user it is ready.
   (quit, not just reload) before the server list refreshes.
 - **`npx` serves a stale version** — run `npx -y page2ai-mcp@latest` once, or clear
   with `npm cache clean --force`.
+- **Updating** — a running server is never replaced: ask the user to quit and reopen the
+  MCP client, which then starts the newest version (`npx -y page2ai-mcp --version` prints
+  it). Do not pin a version or write your own wrapper around `@page2ai/core` for a task:
+  a pinned version, or a `^0.x` range in a wrapper's package.json, never receives the next
+  minor release with its fixes. To convert a local HTML file, pass its text as the tool's
+  `html` argument (with `url` as the page's address, if known).
 - **Node too old** — `EBADENGINE` or a syntax error on start means Node < 20; ask the
   user to upgrade Node.js, do not try to patch around it.
 - **Corporate proxy / offline** — the server itself is local, but it downloads from

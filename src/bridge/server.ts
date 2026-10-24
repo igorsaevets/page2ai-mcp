@@ -49,6 +49,12 @@ const isWebUrl = (url: string): boolean => {
 // The protocol's number, to say which side is older: page2ai-bridge/2 -> 2.
 const protocolNumber = (p: string): number => Number(/^page2ai-bridge\/(\d+)$/.exec(p)?.[1] ?? NaN);
 
+/** How long a refused handshake stays in the agent's results (refusalNote). An extension
+ *  with the switch on retries at least every 30 s, so a problem that lasts stays fresh. */
+export const REFUSAL_NOTE_MS = 5 * 60_000;
+
+type Refusal = { code: 'PROTOCOL_MISMATCH' | 'NO_KEY' | 'UNKNOWN_KEY' | 'AUTH_FAILED'; theirs: number; at: number };
+
 // What a peer says about itself goes into the log: printable and short only.
 const printable = (v: unknown, max = 64): string => String(v ?? '').replace(/[^\x20-\x7e]/g, '?').slice(0, max);
 
@@ -71,6 +77,7 @@ export class BridgeServer {
   private readonly extraOrigins: readonly string[];
   private readonly keys: readonly BridgeKey[];
   private readonly handshakeMs: number;
+  private lastRefusal: Refusal | null = null;
 
   constructor(opts: {
     port?: number;
@@ -94,6 +101,40 @@ export class BridgeServer {
   /** An extension that passed the handshake holds the connection. */
   isConnected(): boolean {
     return this.client !== null && this.client.readyState === WebSocket.OPEN;
+  }
+
+  /** One line for the agent's result when an extension tried to connect within
+   *  REFUSAL_NOTE_MS and this server refused it: the tool then fetches by itself, and
+   *  without the line the agent cannot tell that the browser was meant to serve it, nor
+   *  what the user must fix. Built from this server's own words and numbers only, never
+   *  from the peer's message: any local program can send a hello. */
+  refusalNote(now = Date.now()): string | null {
+    const r = this.lastRefusal;
+    if (!r || this.isConnected() || now - r.at > REFUSAL_NOTE_MS) return null;
+    const lead = 'Fetched without the browser: the Page2AI extension tried to connect';
+    const restart = 'quit and reopen the MCP client';
+    switch (r.code) {
+      case 'PROTOCOL_MISMATCH':
+        if (Number.isNaN(r.theirs)) {
+          return `${lead} with a protocol this server (${this.serverVersion}, ${BRIDGE_PROTOCOL}) does not know.`;
+        }
+        return r.theirs > protocolNumber(BRIDGE_PROTOCOL)
+          ? `${lead} and speaks page2ai-bridge/${r.theirs}, while this server (${this.serverVersion}) speaks ` +
+            `${BRIDGE_PROTOCOL}. Ask the user to ${restart}: one that starts npx -y page2ai-mcp then runs the ` +
+            'newest server; a version named in its settings must be raised.'
+          : `${lead} and speaks page2ai-bridge/${r.theirs}, older than this server's ${BRIDGE_PROTOCOL}. Ask the ` +
+            'user to update the Page2AI extension (the browser does it within a day; chrome://extensions with ' +
+            'Developer mode on has an Update button).';
+      case 'NO_KEY':
+        return `${lead}, but this server has no ${BRIDGE_KEY_ENV}. Ask the user to copy the key from the ` +
+          `Page2AI popup into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
+      case 'UNKNOWN_KEY':
+        return `${lead} with a key this server does not hold. Ask the user to copy the key from the Page2AI ` +
+          `popup into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
+      case 'AUTH_FAILED':
+        return `${lead}, but its proof did not match the key this server holds. Ask the user to copy the key ` +
+          `from the Page2AI popup into the MCP server's ${BRIDGE_KEY_ENV} setting again, then ${restart}.`;
+    }
   }
 
   async start(): Promise<void> {
@@ -287,12 +328,14 @@ export class BridgeServer {
           const theirs = protocolNumber(String(msg.protocol));
           const update = theirs > protocolNumber(BRIDGE_PROTOCOL) ? 'update @page2ai/mcp' : 'update the Page2AI extension';
           this.log(`bridge: refused ${peer}: it speaks ${printable(msg.protocol)}, this server ${BRIDGE_PROTOCOL}; ${update}`);
+          this.lastRefusal = { code: 'PROTOCOL_MISMATCH', theirs, at: Date.now() };
           refuse('PROTOCOL_MISMATCH', `this server speaks ${BRIDGE_PROTOCOL}`, { protocol: BRIDGE_PROTOCOL });
           return;
         }
         const keyId = /^[0-9a-f]{16}$/.test(String(msg.keyId)) ? String(msg.keyId) : '(none)';
         if (this.keys.length === 0) {
           this.log(`bridge: Page2AI ${peer} (key ${keyId}) asked to connect, but this server has no ${BRIDGE_KEY_ENV}: ${HOW_TO_ADD_KEY}`);
+          this.lastRefusal = { code: 'NO_KEY', theirs: NaN, at: Date.now() };
           refuse('NO_KEY', `this server has no ${BRIDGE_KEY_ENV}`);
           return;
         }
@@ -300,6 +343,7 @@ export class BridgeServer {
         if (!key) {
           this.log(`bridge: refused ${peer}: its key ${keyId} is not in ${BRIDGE_KEY_ENV} ` +
             `(${this.keys.map((k) => k.id).join(', ')}); add it, comma-separated, then restart the MCP client`);
+          this.lastRefusal = { code: 'UNKNOWN_KEY', theirs: NaN, at: Date.now() };
           refuse('UNKNOWN_KEY', `key ${keyId} is not in this server's ${BRIDGE_KEY_ENV}`);
           return;
         }
@@ -324,6 +368,7 @@ export class BridgeServer {
       if (stage === 'auth') {
         if (msg.type !== 'auth' || !proofMatches(clientProof(key!.bytes, this.port, nonceS, nonceE), msg.proof)) {
           this.log(`bridge: refused ${peer}: it named key ${key!.id} but could not prove it`);
+          this.lastRefusal = { code: 'AUTH_FAILED', theirs: NaN, at: Date.now() };
           refuse('AUTH_FAILED', 'the proof does not match');
           return;
         }
@@ -336,6 +381,7 @@ export class BridgeServer {
         }
         stage = 'open';
         this.client = ws;
+        this.lastRefusal = null;
         const welcome: WelcomeMessage = { type: 'welcome', protocol: BRIDGE_PROTOCOL, serverVersion: this.serverVersion };
         ws.send(JSON.stringify(welcome));
         this.log(`bridge: extension connected (${peer}, key ${key!.id})`);

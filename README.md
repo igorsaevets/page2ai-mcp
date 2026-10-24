@@ -27,8 +27,14 @@ This starts the stdio MCP server — it waits silently for a client, so wire it 
 the clients below rather than running it bare. Requires **Node.js 20+**. No API key. If
 `npx` ever serves you a stale cached version, run `npx -y page2ai-mcp@latest` once.
 
-`page2ai-mcp` is a thin unscoped wrapper around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp);
-since 0.2.5 it follows the latest server automatically via a `^` range.
+**Updating.** `npx -y page2ai-mcp` asks npm for the newest version each time the server
+starts, but an MCP client keeps the server running until you quit it: quitting and
+reopening the client is the update. A version named in the config (`page2ai-mcp@0.6.2`)
+stays until you change it. `npx -y page2ai-mcp --version` prints the version npx runs now.
+
+`page2ai-mcp` is a thin unscoped wrapper around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp),
+released together with it; its dependency is a `^` range, which on 0.x versions admits
+patch releases only.
 
 ### Hosted endpoint (beta) — no install at all
 
