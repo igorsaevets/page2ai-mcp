@@ -187,13 +187,15 @@ The server fetches without cookies and runs no page scripts. For a page that nee
   `"env": { "PAGE2AI_BRIDGE_KEY": "<key>" }` to the server entry; with Claude Code,
   `claude mcp add page2ai -e PAGE2AI_BRIDGE_KEY=<key> -- npx -y @page2ai/mcp`. Restart the MCP
   client after. Several browsers or profiles: put their keys in the one variable, separated by
-  commas; the first to connect holds the bridge. Without a key the server never sends a page to a
+  commas; the first to connect holds the bridge. Several MCP clients running Page2AI (Claude
+  Desktop and Cursor, say): the one started first holds port 3025 and the others run without the
+  bridge, so give the key to each of them. Without a key the server never sends a page to a
   browser, and the popup and this server's log say what to paste where. On every connection both
   sides prove they know the key (an HMAC exchange; the key never crosses the socket), the server
   first: a program that took port 3025 while no server ran gets nothing from the extension, and a
   program that connects to the server without the key cannot ask it for pages. Firefox needs no
   extra setting since 0.6.0 (0.5.3 required the install's UUID in `PAGE2AI_BRIDGE_ORIGINS`).
-  *New key* in the popup, or reinstalling the extension, makes a new key: paste it again.
+  *New key* in the popup, or reinstalling the extension, makes a new key: replace the old one with it.
   Whoever reads your MCP client's config or the browser profile can read the key: the bridge is
   no stronger than your user account.
 
@@ -268,7 +270,7 @@ Environment variables of the local server, all optional:
 | Variable | Default | Effect |
 |---|---|---|
 | `PAGE2AI_BRIDGE_KEY` | — | The Agent Bridge key(s) from the Page2AI popup, comma-separated. Without one the bridge connects no browser |
-| `PAGE2AI_BRIDGE_PORT` | `3025` | Port of the Agent Bridge on 127.0.0.1. If it is taken (another running instance), the server starts without the bridge |
+| `PAGE2AI_BRIDGE_PORT` | `3025` | Port of the Agent Bridge on 127.0.0.1. The extension connects to 3025 only, so change it for tests, not for a browser. If it is taken (another running instance), the server starts without the bridge |
 | `PAGE2AI_BRIDGE_ORIGINS` | — | Exact origins of unpacked or self-built Chrome builds the bridge accepts besides Page2AI's Web Store ID, comma-separated (`chrome-extension://<id>`). Firefox needs none |
 
 Planned: a `profile` argument (`auto | docs | marketing | research | dashboard | wordpress-marketing`).

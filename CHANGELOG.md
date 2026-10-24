@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.6.1 - 2026-10-24
+
+Fixes from the review panel of 0.6.0.
+
+### Fixed
+
+- **A refused bridge connection is not read any more.** 0.6.0 kept reading a socket it had refused until the socket closed: each further `hello` wrote another refusal line into the MCP client's log, and a client that failed the proof could try again on the same socket (it still needed the key).
+- **`PAGE2AI_BRIDGE_KEY="<key>"` is read.** 0.6.0 removed the quotes before the variable's name, so the value kept a quote and was refused. Also read now: spaces around `=`, a JSON pair `"PAGE2AI_BRIDGE_KEY": "<key>"`, `export PAGE2AI_BRIDGE_KEY=<key>`.
+- **Firefox's stable origin form** (`moz-extension://` and 64 letters a-p, added in Firefox 150 for WebAuthn) may start the handshake too, so a later switch of extension pages to it does not shut Firefox out. The key still decides.
+
+### Docs
+
+- README: `PAGE2AI_BRIDGE_PORT` is for tests, since the extension connects to 3025 only; with several MCP clients the one started first holds the port, so each needs the key; a new key replaces the old one. SECURITY.md: what a local program can still do (keep the bridge from connecting, not read from it), and that the key does not encrypt.
+
+### Tests
+
+- `tests/bridge-fallback.test.ts` no longer reaches the machine's DNS, which failed it once in five runs.
+
 ## 0.6.0 - 2026-10-24
 
 ### Security

@@ -217,9 +217,10 @@ export class BridgeServer {
     // other Chrome extensions their own IDs; Firefox gives each install a random
     // moz-extension:// UUID, so any Firefox origin may try the handshake, and only
     // the key admits Page2AI (0.5.3 required that UUID in PAGE2AI_BRIDGE_ORIGINS).
+    // Firefox 150 added a stable form, 64 letters a-p, for WebAuthn; it is let in too.
     const origin = req.headers.origin ?? '';
     if (origin !== PAGE2AI_CHROME_ORIGIN && !this.extraOrigins.includes(origin) &&
-        !/^moz-extension:\/\/[0-9a-f-]{36}$/i.test(origin)) {
+        !/^moz-extension:\/\/(?:[0-9a-f-]{36}|[a-p]{64})$/i.test(origin)) {
       const hint = origin.startsWith('chrome-extension://')
         ? '; if this is an unpacked Page2AI build, add its origin to PAGE2AI_BRIDGE_ORIGINS'
         : '';
@@ -239,7 +240,10 @@ export class BridgeServer {
 
   private handleConnection(ws: WebSocket): void {
     this.handshakes.add(ws);
-    let stage: 'hello' | 'auth' | 'open' = 'hello';
+    // 'closed': refused, and nothing it sends is read any more. 0.6.0 read on until the
+    // socket closed: every further hello logged another refusal, and a failed proof got
+    // a second try.
+    let stage: 'hello' | 'auth' | 'open' | 'closed' = 'hello';
     let key: BridgeKey | null = null;
     let nonceE = '';
     let nonceS = '';
@@ -249,28 +253,33 @@ export class BridgeServer {
       if (stage !== 'open') ws.terminate();
     }, this.handshakeMs);
 
+    const drop = (): void => {
+      stage = 'closed';
+      ws.close();
+    };
     const refuse = (code: string, message: string, extra: Partial<ServerErrorMessage> = {}): void => {
       const err: ServerErrorMessage = { type: 'error', code, message, ...extra };
       ws.send(JSON.stringify(err));
-      ws.close();
+      drop();
     };
 
     ws.on('message', (data) => {
+      if (stage === 'closed') return;
       let msg: Record<string, unknown>;
       try {
         msg = JSON.parse(String(data));
       } catch {
-        ws.close();
+        drop();
         return;
       }
       if (!msg || typeof msg !== 'object') {
-        ws.close();
+        drop();
         return;
       }
 
       if (stage === 'hello') {
         if (msg.type !== 'hello') {
-          ws.close();
+          drop();
           return;
         }
         peer = `${printable(msg.extensionId)} v${printable(msg.extensionVersion, 20)}`;
@@ -295,7 +304,7 @@ export class BridgeServer {
           return;
         }
         if (!isHex64(msg.nonceE)) {
-          ws.close();
+          drop();
           return;
         }
         nonceE = msg.nonceE;
@@ -332,6 +341,9 @@ export class BridgeServer {
         this.log(`bridge: extension connected (${peer}, key ${key!.id})`);
         return;
       }
+
+      // Only a connection that proved the key gets this far.
+      if (stage !== 'open') return;
 
       if (msg.type === 'ping') {
         const pong: PongMessage = { type: 'pong' };

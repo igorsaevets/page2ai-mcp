@@ -61,7 +61,13 @@ server refuses every browser. This stops a program that listens on the port whil
 (0.5.0 to 0.5.4: the extension obeyed it, opened the pages in the signed-in browser and sent their
 text back), a program that connects to the server without the key, other
 browser extensions, web pages, and a relay through another port. At most 4 connections may wait in
-the handshake, 5 s each. **Out of scope:** malware running as the same OS user, which can read the
+the handshake, 5 s each, and a refused one is not read any more (0.6.1). A local program can still
+keep the bridge from connecting, by taking the port before the server starts or by filling those 4
+places, but it gets no proof and no page. On Windows a second listener on `127.0.0.1:3025` is
+refused even to the same user (`WSAEACCES` with `SO_REUSEADDR`), and one on `0.0.0.0:3025` gets
+none of the connections to `127.0.0.1` (measured 2026-10-24, Windows 11). The key authenticates
+and does not encrypt: pages cross loopback as plain text, readable to an administrator who captures
+loopback traffic. **Out of scope:** malware running as the same OS user, which can read the
 key from the MCP client's config or the browser profile.
 In scope: a web page, a remote host, another browser extension, another OS user, or a local program
 without the key reaching the bridge or posing as it.

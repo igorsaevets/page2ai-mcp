@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { Socket } from 'node:net';
 import { BridgeServer, PAGE2AI_CHROME_ORIGIN } from '../src/bridge/server.js';
 import { BRIDGE_PROTOCOL } from '../src/bridge/protocol.js';
@@ -167,6 +167,35 @@ describe('BridgeServer, page2ai-bridge/2', () => {
     expect(server.isConnected()).toBe(false);
   });
 
+  // 0.6.0 kept reading a socket it had refused until the socket closed: each further
+  // hello wrote another refusal line into the MCP client's log, and a failed proof got
+  // a second try (the T172 panel).
+  it('is done with a socket it refused: three hellos make one refusal line', async () => {
+    const lines: string[] = [];
+    await start({ keys: [], log: (m) => lines.push(m) });
+    const ws = await connect(TEST_PORT);
+    hello(ws, KEY);
+    hello(ws, KEY);
+    hello(ws, KEY);
+    expect(await readMsg(ws)).toMatchObject({ type: 'error', code: 'NO_KEY' });
+    await closed(ws);
+    expect(lines.filter((l) => l.includes('asked to connect'))).toHaveLength(1);
+  });
+
+  it('gives a socket that failed the proof no second try, even with the right proof', async () => {
+    const lines: string[] = [];
+    await start({ log: (m) => lines.push(m) });
+    const ws = await connect(TEST_PORT);
+    const nonceE = hello(ws, KEY);
+    const nonceS = String((await readMsg(ws)).nonceS);
+    ws.send(JSON.stringify({ type: 'auth', proof: randomBytes(32).toString('hex') }));
+    ws.send(JSON.stringify({ type: 'auth', proof: clientProofFor(KEY, TEST_PORT, nonceS, nonceE) }));
+    expect(await readMsg(ws)).toMatchObject({ type: 'error', code: 'AUTH_FAILED' });
+    await closed(ws);
+    expect(lines.filter((l) => l.includes('extension connected'))).toEqual([]);
+    expect(server.isConnected()).toBe(false);
+  });
+
   it('answers a page2ai-bridge/1 extension with PROTOCOL_MISMATCH and its own protocol', async () => {
     const lines: string[] = [];
     await start({ log: (m) => lines.push(m) });
@@ -248,6 +277,20 @@ describe('BridgeServer, page2ai-bridge/2', () => {
     const ws = await connect(TEST_PORT, FIREFOX_PAGE2AI);
     expect((await handshake(ws)).reply?.type).toBe('welcome');
     ws.close();
+  });
+
+  // Firefox 150 added a stable origin, moz-extension:// + the add-on ID's SHA-256 written
+  // in the letters a-p, for WebAuthn (blog.mozilla.org/addons, 2026-04-23); extension pages
+  // keep the UUID. Admitted too, so a later switch does not shut Firefox out.
+  const FIREFOX_STABLE = `moz-extension://${createHash('sha256').update('page2ai@igorsaevets.com').digest('hex')
+    .replace(/[0-9a-f]/g, (c) => 'abcdefghijklmnop'[parseInt(c, 16)])}`;
+
+  it('lets the Firefox stable origin form try too, and admits it only with the key', async () => {
+    await start();
+    const ws = await connect(TEST_PORT, FIREFOX_STABLE);
+    expect((await handshake(ws)).reply?.type).toBe('welcome');
+    ws.close();
+    await expect(connect(TEST_PORT, `${FIREFOX_STABLE}q`)).rejects.toThrow(/403/);
   });
 
   it('accepts an unpacked Chrome build listed in PAGE2AI_BRIDGE_ORIGINS, still only with the key', async () => {
@@ -361,10 +404,19 @@ describe('parseBridgeKeys', () => {
     expect(problems).toEqual([]);
   });
 
+  // 0.6.0 stripped the quotes before the name, so NAME="key" kept a quote and was refused.
+  it('takes the key out of a line pasted whole: quoted, spaced, a JSON pair, a shell export', () => {
+    for (const line of [`PAGE2AI_BRIDGE_KEY="${a}"`, `PAGE2AI_BRIDGE_KEY='${a}'`, `PAGE2AI_BRIDGE_KEY = ${a}`,
+      `"PAGE2AI_BRIDGE_KEY": "${a}"`, `export PAGE2AI_BRIDGE_KEY=${a}`, `"PAGE2AI_BRIDGE_KEY=${a}"`]) {
+      expect(parseBridgeKeys(line), line).toEqual({ keys: [{ id: keyIdOf(KEY), bytes: KEY }], problems: [] });
+    }
+  });
+
   it('treats an empty or unexpanded MCPB field as no key', () => {
     expect(parseBridgeKeys(undefined).keys).toEqual([]);
     expect(parseBridgeKeys('').keys).toEqual([]);
     expect(parseBridgeKeys('${user_config.bridge_key}')).toEqual({ keys: [], problems: [] });
+    expect(parseBridgeKeys('PAGE2AI_BRIDGE_KEY=${user_config.bridge_key}')).toEqual({ keys: [], problems: [] });
   });
 
   it('reports a bad entry by its position and length, never by its value', () => {

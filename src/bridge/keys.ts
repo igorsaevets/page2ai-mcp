@@ -16,22 +16,24 @@ export interface BridgeKey {
 
 // 32 bytes in base64url: 43 characters, padding optional.
 const KEY_PATTERN = /^[A-Za-z0-9_-]{43}=?$/;
+// The variable's own name pasted along: an env line, a shell export or a JSON pair.
+const NAME_PREFIX = new RegExp(`^(?:export\\s+)?["']?${BRIDGE_KEY_ENV}["']?\\s*[:=]\\s*`);
 const HEX64 = /^[0-9a-f]{64}$/;
 
 export const keyIdOf = (bytes: Buffer): string =>
   createHash('sha256').update(bytes).digest('hex').slice(0, 16);
 
 /** Reads PAGE2AI_BRIDGE_KEY. Tolerates what a copy-paste brings along (spaces,
- *  quotes, the variable's own name before `=`); an MCPB field left empty may arrive
- *  unexpanded and counts as no key. A bad entry is reported by its position, never
- *  by its value: the log goes to the MCP client's files. */
+ *  quotes, the variable's own name before `=` or `:`); an MCPB field left empty may
+ *  arrive unexpanded and counts as no key. A bad entry is reported by its position,
+ *  never by its value: the log goes to the MCP client's files. */
 export const parseBridgeKeys = (raw: string | undefined): { keys: BridgeKey[]; problems: string[] } => {
   const keys: BridgeKey[] = [];
   const problems: string[] = [];
   const entries = (raw ?? '').split(',');
   entries.forEach((entry, i) => {
-    let s = entry.trim().replace(/^["']+|["']+$/g, '').trim();
-    if (s.startsWith(`${BRIDGE_KEY_ENV}=`)) s = s.slice(BRIDGE_KEY_ENV.length + 1).trim();
+    // The name first, then the quotes: 0.6.0 did it the other way round and refused NAME="key".
+    const s = entry.trim().replace(NAME_PREFIX, '').replace(/^["']+|["']+$/g, '').trim();
     if (s === '' || s.includes('${')) return;
     if (!KEY_PATTERN.test(s)) {
       problems.push(`entry ${i + 1} of ${entries.length} is not a Page2AI key ` +
