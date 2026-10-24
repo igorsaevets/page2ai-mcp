@@ -1,8 +1,17 @@
 // Agent Bridge WebSocket protocol types.
 // Transport: JSON text frames over ws://127.0.0.1:PORT.
-// Security model: BrowserTools MCP v2.0 (post GHSA-xvrv-w8pg-f25f).
+//
+// page2ai-bridge/2 (0.6.0): both ends prove they know a key the extension made and
+// the user pasted into this server's PAGE2AI_BRIDGE_KEY, before anything else runs.
+//   ext → srv  hello      {keyId, nonceE}
+//   srv → ext  challenge  {nonceS, proof: HMAC(key, "page2ai-bridge/2|server|<port>|<nonceE>|<nonceS>")}
+//   ext → srv  auth       {proof: HMAC(key, "page2ai-bridge/2|client|<port>|<nonceS>|<nonceE>")}
+//   srv → ext  welcome
+// The extension checks the server's proof before it sends its own and before it
+// accepts any convert: a program that took the port without the key gets nothing.
+// The port is inside both proofs, so a relay through another port fails.
 
-export const BRIDGE_PROTOCOL = 'page2ai-bridge/1';
+export const BRIDGE_PROTOCOL = 'page2ai-bridge/2';
 export const DEFAULT_BRIDGE_PORT = 3025;
 
 /** A bridge failure with the protocol's code (TIMEOUT, PERMISSION_REQUIRED, ...).
@@ -21,20 +30,27 @@ export class BridgeError extends Error {
 
 export interface HelloMessage {
   type: 'hello';
-  protocol: typeof BRIDGE_PROTOCOL;
+  protocol: string;
   extensionId: string;
   extensionVersion: string;
+  /** First 16 hex digits of SHA-256(key): which of the server's keys to use. */
+  keyId: string;
+  /** 32 random bytes, hex. */
+  nonceE: string;
+}
+
+export interface AuthMessage {
+  type: 'auth';
+  proof: string;
 }
 
 export interface PingMessage {
   type: 'ping';
-  token: string;
 }
 
 export interface ConvertResultMessage {
   type: 'result';
   id: string;
-  token: string;
   markdown: string;
   title: string;
   url: string;
@@ -45,28 +61,38 @@ export interface ConvertResultMessage {
 export interface ConvertErrorMessage {
   type: 'error';
   id: string;
-  token: string;
   // TIMEOUT means the caller's time is spent: the server answers it without a fetch.
   // Every other code is a refusal, after which the server fetches the URL itself.
   code: 'TAB_LOAD_FAILED' | 'EXTRACTION_FAILED' | 'TIMEOUT' | 'RESTRICTED_URL' | 'PERMISSION_REQUIRED';
   message: string;
 }
 
-export type ExtensionMessage = HelloMessage | PingMessage | ConvertResultMessage | ConvertErrorMessage;
+export type ExtensionMessage = HelloMessage | AuthMessage | PingMessage | ConvertResultMessage | ConvertErrorMessage;
 
 // --- Server → Extension ---
+
+export interface ChallengeMessage {
+  type: 'challenge';
+  protocol: typeof BRIDGE_PROTOCOL;
+  serverVersion: string;
+  /** 32 random bytes, hex. */
+  nonceS: string;
+  proof: string;
+}
 
 export interface WelcomeMessage {
   type: 'welcome';
   protocol: typeof BRIDGE_PROTOCOL;
   serverVersion: string;
-  token: string;
 }
 
+/** Before the handshake ends: NO_KEY, UNKNOWN_KEY, PROTOCOL_MISMATCH (with the
+ *  server's `protocol`), AUTH_FAILED, ALREADY_CONNECTED. */
 export interface ServerErrorMessage {
   type: 'error';
   code: string;
   message: string;
+  protocol?: string;
 }
 
 export interface ConvertRequestMessage {
@@ -84,7 +110,7 @@ export interface PongMessage {
   type: 'pong';
 }
 
-export type ServerMessage = WelcomeMessage | ServerErrorMessage | ConvertRequestMessage | PongMessage;
+export type ServerMessage = ChallengeMessage | WelcomeMessage | ServerErrorMessage | ConvertRequestMessage | PongMessage;
 
 // --- Bridge convert API ---
 

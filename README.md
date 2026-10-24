@@ -179,13 +179,23 @@ The server fetches without cookies and runs no page scripts. For a page that nee
   saying why; when the browser ends on another page (a sign-in redirect), a second text block
   names the page it got. Private, loopback and cloud metadata addresses are refused before the
   browser opens them, as by the server's own fetch, and so is a page the browser was redirected
-  to at one. The bridge listens on `ws://127.0.0.1:3025` only. In Chrome it accepts
-  the Page2AI extension alone (its Web Store ID). Firefox gives each install a random origin, so
-  a Firefox install is accepted only by its exact origin listed in `PAGE2AI_BRIDGE_ORIGINS`
-  (Firefox shows it at `about:debugging#/runtime/this-firefox` as the extension's Internal UUID:
-  `moz-extension://<that UUID>`); 0.5.0 to 0.5.2 accepted any Firefox extension. The origin check
-  stops web pages and other browser extensions; another program on the same computer can claim
-  any origin, so the bridge is no stronger than your user account.
+  to at one. The bridge listens on `ws://127.0.0.1:3025` only.
+
+  **The key (0.6.0 and later).** The bridge works only with the key the extension shows: popup →
+  *Agent Bridge* on → *Copy key*. Give it to this server as `PAGE2AI_BRIDGE_KEY`: in Claude Desktop
+  (the `.mcpb` extension) paste it into Page2AI's setting *Agent Bridge key*; in a JSON config add
+  `"env": { "PAGE2AI_BRIDGE_KEY": "<key>" }` to the server entry; with Claude Code,
+  `claude mcp add page2ai -e PAGE2AI_BRIDGE_KEY=<key> -- npx -y @page2ai/mcp`. Restart the MCP
+  client after. Several browsers or profiles: put their keys in the one variable, separated by
+  commas; the first to connect holds the bridge. Without a key the server never sends a page to a
+  browser, and the popup and this server's log say what to paste where. On every connection both
+  sides prove they know the key (an HMAC exchange; the key never crosses the socket), the server
+  first: a program that took port 3025 while no server ran gets nothing from the extension, and a
+  program that connects to the server without the key cannot ask it for pages. Firefox needs no
+  extra setting since 0.6.0 (0.5.3 required the install's UUID in `PAGE2AI_BRIDGE_ORIGINS`).
+  *New key* in the popup, or reinstalling the extension, makes a new key: paste it again.
+  Whoever reads your MCP client's config or the browser profile can read the key: the bridge is
+  no stronger than your user account.
 
 ## Example prompts
 
@@ -253,12 +263,13 @@ No setup required — every argument has a sensible default. `page_to_markdown` 
 The hosted endpoint takes `url` only (the contract its ChatGPT plugin was reviewed with) and
 caps `timeout_ms` at 20000.
 
-Environment variables of the local server, both optional:
+Environment variables of the local server, all optional:
 
 | Variable | Default | Effect |
 |---|---|---|
+| `PAGE2AI_BRIDGE_KEY` | — | The Agent Bridge key(s) from the Page2AI popup, comma-separated. Without one the bridge connects no browser |
 | `PAGE2AI_BRIDGE_PORT` | `3025` | Port of the Agent Bridge on 127.0.0.1. If it is taken (another running instance), the server starts without the bridge |
-| `PAGE2AI_BRIDGE_ORIGINS` | — | Exact extension origins the bridge accepts besides Page2AI's Web Store ID, comma-separated: a Firefox install's `moz-extension://<uuid>`, an unpacked build's `chrome-extension://<id>` |
+| `PAGE2AI_BRIDGE_ORIGINS` | — | Exact origins of unpacked or self-built Chrome builds the bridge accepts besides Page2AI's Web Store ID, comma-separated (`chrome-extension://<id>`). Firefox needs none |
 
 Planned: a `profile` argument (`auto | docs | marketing | research | dashboard | wordpress-marketing`).
 

@@ -2,12 +2,15 @@
 // to the Page2AI browser extension for extraction through the user's real
 // browser (cookies, JS rendering, extension-quality Markdown).
 //
-// Security model (BrowserTools MCP v2.0, post GHSA-xvrv-w8pg-f25f):
+// Security model:
 //   1. Bind 127.0.0.1 only (never 0.0.0.0)
-//   2. Origin validation: Page2AI's Chrome Web Store origin, and the exact origins
-//      in PAGE2AI_BRIDGE_ORIGINS (a Firefox install, an unpacked build)
+//   2. Origin, a first filter: Page2AI's Chrome Web Store origin, the exact origins
+//      in PAGE2AI_BRIDGE_ORIGINS (an unpacked build), and any moz-extension:// origin
+//      (Firefox gives every install a random UUID; the key below tells them apart)
 //   3. Host header: must be 127.0.0.1:PORT or localhost:PORT
-//   4. Per-session token: generated on auth, required on every message
+//   4. page2ai-bridge/2: both ends prove they know a key from PAGE2AI_BRIDGE_KEY
+//      (protocol.ts). Without a key nothing converts. A socket holds the single
+//      slot only after the proof; at most 4 sockets wait in a handshake, 5 s each.
 
 import { createServer, type Server as HttpServer, type IncomingMessage } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -18,16 +21,22 @@ import {
   DEFAULT_BRIDGE_PORT,
   type BridgeConvertOptions,
   type BridgeConvertResult,
+  type ChallengeMessage,
   type ConvertRequestMessage,
-  type ExtensionMessage,
   type WelcomeMessage,
   type PongMessage,
   type ServerErrorMessage,
 } from './protocol.js';
+import { BRIDGE_KEY_ENV, clientProof, isHex64, proofMatches, serverProof, type BridgeKey } from './keys.js';
 
 /** Page2AI's Chrome Web Store ID: Chrome, Edge and the other Chromium browsers
  *  that install from the store send this Origin. */
 export const PAGE2AI_CHROME_ORIGIN = 'chrome-extension://dlpaaijcnbbmlfeohlphjpnbbcnomnno';
+
+const MAX_HANDSHAKES = 4;
+const HANDSHAKE_MS = 5000;
+const HOW_TO_ADD_KEY = 'copy the key from the Page2AI popup (Agent Bridge, Copy key) into ' +
+  `${BRIDGE_KEY_ENV} in this server's settings, then restart the MCP client`;
 
 const isWebUrl = (url: string): boolean => {
   try {
@@ -36,6 +45,12 @@ const isWebUrl = (url: string): boolean => {
     return false;
   }
 };
+
+// The protocol's number, to say which side is older: page2ai-bridge/2 -> 2.
+const protocolNumber = (p: string): number => Number(/^page2ai-bridge\/(\d+)$/.exec(p)?.[1] ?? NaN);
+
+// What a peer says about itself goes into the log: printable and short only.
+const printable = (v: unknown, max = 64): string => String(v ?? '').replace(/[^\x20-\x7e]/g, '?').slice(0, max);
 
 type PendingRequest = {
   resolve: (result: BridgeConvertResult) => void;
@@ -47,13 +62,15 @@ export class BridgeServer {
   private httpServer: HttpServer | null = null;
   private wss: WebSocketServer | null = null;
   private client: WebSocket | null = null;
-  private sessionToken: string | null = null;
+  private handshakes = new Set<WebSocket>();
   private pending = new Map<string, PendingRequest>();
   private requestCounter = 0;
   private readonly port: number;
   private readonly serverVersion: string;
   private readonly log: (msg: string) => void;
   private readonly extraOrigins: readonly string[];
+  private readonly keys: readonly BridgeKey[];
+  private readonly handshakeMs: number;
 
   constructor(opts: {
     port?: number;
@@ -61,13 +78,20 @@ export class BridgeServer {
     log: (msg: string) => void;
     /** Exact origins accepted beside the store's, e.g. an unpacked build's. */
     extraOrigins?: readonly string[];
+    /** From PAGE2AI_BRIDGE_KEY (keys.ts). None: the bridge answers NO_KEY. */
+    keys?: readonly BridgeKey[];
+    /** How long a socket may take to finish the handshake (tests shorten it). */
+    handshakeMs?: number;
   }) {
     this.port = opts.port ?? DEFAULT_BRIDGE_PORT;
     this.serverVersion = opts.serverVersion;
     this.log = opts.log;
     this.extraOrigins = opts.extraOrigins ?? [];
+    this.keys = opts.keys ?? [];
+    this.handshakeMs = opts.handshakeMs ?? HANDSHAKE_MS;
   }
 
+  /** An extension that passed the handshake holds the connection. */
   isConnected(): boolean {
     return this.client !== null && this.client.readyState === WebSocket.OPEN;
   }
@@ -104,9 +128,14 @@ export class BridgeServer {
     this.wss = new WebSocketServer({
       server: this.httpServer,
       verifyClient: (info, cb) => {
-        const allowed = this.verifyUpgrade(info.req);
-        if (!allowed) {
+        if (!this.verifyUpgrade(info.req)) {
           cb(false, 403, 'Forbidden');
+          return;
+        }
+        // Sockets that never finish the handshake hold no slot, but they are
+        // capped: a flood cannot grow memory, only delay the extension.
+        if (this.handshakes.size >= MAX_HANDSHAKES) {
+          cb(false, 503, 'Busy');
           return;
         }
         cb(true);
@@ -120,9 +149,12 @@ export class BridgeServer {
       this.log(`bridge wss error: ${err.message}`);
     });
 
-    this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
+    this.wss.on('connection', (ws) => this.handleConnection(ws));
 
-    this.log(`bridge listening on ws://127.0.0.1:${this.port}`);
+    const keyNote = this.keys.length
+      ? `${this.keys.length} key(s): ${this.keys.map((k) => k.id).join(', ')}`
+      : `no ${BRIDGE_KEY_ENV}, so no browser can connect yet: ${HOW_TO_ADD_KEY}`;
+    this.log(`bridge listening on ws://127.0.0.1:${this.port} (${keyNote})`);
   }
 
   async stop(): Promise<void> {
@@ -136,13 +168,13 @@ export class BridgeServer {
     // waited with it after its client had closed stdin (0.5.3).
     this.client?.terminate();
     this.client = null;
-    this.sessionToken = null;
 
     if (this.wss) {
       for (const socket of this.wss.clients) socket.terminate();
       this.wss.close();
       this.wss = null;
     }
+    this.handshakes.clear();
     if (this.httpServer) {
       this.httpServer.closeAllConnections();
       await new Promise<void>((resolve) => {
@@ -181,89 +213,123 @@ export class BridgeServer {
   }
 
   private verifyUpgrade(req: IncomingMessage): boolean {
-    // Page2AI only. Any installed extension may open a WebSocket to localhost
-    // without a permission, and the one holding this single connection reads
-    // every URL the agent asks for and writes what the agent then reads.
-    // Firefox gives each install a random moz-extension:// UUID, so a scheme
-    // check would admit every Firefox extension (0.5.0-0.5.2 did): a Firefox
-    // install is admitted only by its exact origin in PAGE2AI_BRIDGE_ORIGINS (its
-    // Internal UUID in about:debugging; the log line below names a refused one).
+    // A first filter, not the lock: the key is. Web pages send http(s) origins and
+    // other Chrome extensions their own IDs; Firefox gives each install a random
+    // moz-extension:// UUID, so any Firefox origin may try the handshake, and only
+    // the key admits Page2AI (0.5.3 required that UUID in PAGE2AI_BRIDGE_ORIGINS).
     const origin = req.headers.origin ?? '';
-    if (origin !== PAGE2AI_CHROME_ORIGIN && !this.extraOrigins.includes(origin)) {
-      const hint = origin.startsWith('moz-extension://')
-        ? `; if this is Page2AI in Firefox, add PAGE2AI_BRIDGE_ORIGINS=${origin} to this server's environment`
+    if (origin !== PAGE2AI_CHROME_ORIGIN && !this.extraOrigins.includes(origin) &&
+        !/^moz-extension:\/\/[0-9a-f-]{36}$/i.test(origin)) {
+      const hint = origin.startsWith('chrome-extension://')
+        ? '; if this is an unpacked Page2AI build, add its origin to PAGE2AI_BRIDGE_ORIGINS'
         : '';
-      this.log(`bridge: rejected Origin "${origin}"${hint}`);
+      this.log(`bridge: rejected Origin "${printable(origin, 120)}"${hint}`);
       return false;
     }
 
     const host = req.headers.host ?? '';
     const allowed = [`127.0.0.1:${this.port}`, `localhost:${this.port}`];
     if (!allowed.includes(host)) {
-      this.log(`bridge: rejected Host "${host}"`);
+      this.log(`bridge: rejected Host "${printable(host, 120)}"`);
       return false;
     }
 
     return true;
   }
 
-  private handleConnection(ws: WebSocket, _req: IncomingMessage): void {
-    if (this.client && this.client.readyState === WebSocket.OPEN) {
-      const err: ServerErrorMessage = {
-        type: 'error',
-        code: 'ALREADY_CONNECTED',
-        message: 'Another extension is already connected',
-      };
+  private handleConnection(ws: WebSocket): void {
+    this.handshakes.add(ws);
+    let stage: 'hello' | 'auth' | 'open' = 'hello';
+    let key: BridgeKey | null = null;
+    let nonceE = '';
+    let nonceS = '';
+    let peer = '';
+
+    const timer = setTimeout(() => {
+      if (stage !== 'open') ws.terminate();
+    }, this.handshakeMs);
+
+    const refuse = (code: string, message: string, extra: Partial<ServerErrorMessage> = {}): void => {
+      const err: ServerErrorMessage = { type: 'error', code, message, ...extra };
       ws.send(JSON.stringify(err));
       ws.close();
-      return;
-    }
-
-    let authenticated = false;
-    const authTimeout = setTimeout(() => {
-      if (!authenticated) {
-        ws.close();
-      }
-    }, 5000);
+    };
 
     ws.on('message', (data) => {
-      let msg: ExtensionMessage;
+      let msg: Record<string, unknown>;
       try {
         msg = JSON.parse(String(data));
       } catch {
         ws.close();
         return;
       }
-
-      if (!authenticated) {
-        if (msg.type === 'hello' && msg.protocol === BRIDGE_PROTOCOL) {
-          clearTimeout(authTimeout);
-          authenticated = true;
-          this.sessionToken = randomBytes(32).toString('hex');
-          this.client = ws;
-
-          const welcome: WelcomeMessage = {
-            type: 'welcome',
-            protocol: BRIDGE_PROTOCOL,
-            serverVersion: this.serverVersion,
-            token: this.sessionToken,
-          };
-          ws.send(JSON.stringify(welcome));
-          this.log(`bridge: extension connected (${msg.extensionId} v${msg.extensionVersion})`);
-        } else {
-          const err: ServerErrorMessage = {
-            type: 'error',
-            code: 'AUTH_FAILED',
-            message: `Expected hello with protocol ${BRIDGE_PROTOCOL}`,
-          };
-          ws.send(JSON.stringify(err));
-          ws.close();
-        }
+      if (!msg || typeof msg !== 'object') {
+        ws.close();
         return;
       }
 
-      if (!('token' in msg) || (msg as { token?: string }).token !== this.sessionToken) {
-        ws.close();
+      if (stage === 'hello') {
+        if (msg.type !== 'hello') {
+          ws.close();
+          return;
+        }
+        peer = `${printable(msg.extensionId)} v${printable(msg.extensionVersion, 20)}`;
+        if (msg.protocol !== BRIDGE_PROTOCOL) {
+          const theirs = protocolNumber(String(msg.protocol));
+          const update = theirs > protocolNumber(BRIDGE_PROTOCOL) ? 'update @page2ai/mcp' : 'update the Page2AI extension';
+          this.log(`bridge: refused ${peer}: it speaks ${printable(msg.protocol)}, this server ${BRIDGE_PROTOCOL}; ${update}`);
+          refuse('PROTOCOL_MISMATCH', `this server speaks ${BRIDGE_PROTOCOL}`, { protocol: BRIDGE_PROTOCOL });
+          return;
+        }
+        const keyId = /^[0-9a-f]{16}$/.test(String(msg.keyId)) ? String(msg.keyId) : '(none)';
+        if (this.keys.length === 0) {
+          this.log(`bridge: Page2AI ${peer} (key ${keyId}) asked to connect, but this server has no ${BRIDGE_KEY_ENV}: ${HOW_TO_ADD_KEY}`);
+          refuse('NO_KEY', `this server has no ${BRIDGE_KEY_ENV}`);
+          return;
+        }
+        key = this.keys.find((k) => k.id === keyId) ?? null;
+        if (!key) {
+          this.log(`bridge: refused ${peer}: its key ${keyId} is not in ${BRIDGE_KEY_ENV} ` +
+            `(${this.keys.map((k) => k.id).join(', ')}); add it, comma-separated, then restart the MCP client`);
+          refuse('UNKNOWN_KEY', `key ${keyId} is not in this server's ${BRIDGE_KEY_ENV}`);
+          return;
+        }
+        if (!isHex64(msg.nonceE)) {
+          ws.close();
+          return;
+        }
+        nonceE = msg.nonceE;
+        nonceS = randomBytes(32).toString('hex');
+        stage = 'auth';
+        const challenge: ChallengeMessage = {
+          type: 'challenge',
+          protocol: BRIDGE_PROTOCOL,
+          serverVersion: this.serverVersion,
+          nonceS,
+          proof: serverProof(key.bytes, this.port, nonceE, nonceS),
+        };
+        ws.send(JSON.stringify(challenge));
+        return;
+      }
+
+      if (stage === 'auth') {
+        if (msg.type !== 'auth' || !proofMatches(clientProof(key!.bytes, this.port, nonceS, nonceE), msg.proof)) {
+          this.log(`bridge: refused ${peer}: it named key ${key!.id} but could not prove it`);
+          refuse('AUTH_FAILED', 'the proof does not match');
+          return;
+        }
+        clearTimeout(timer);
+        this.handshakes.delete(ws);
+        if (this.isConnected()) {
+          this.log(`bridge: refused ${peer} (key ${key!.id}): another browser holds the connection`);
+          refuse('ALREADY_CONNECTED', 'another browser is connected to this server');
+          return;
+        }
+        stage = 'open';
+        this.client = ws;
+        const welcome: WelcomeMessage = { type: 'welcome', protocol: BRIDGE_PROTOCOL, serverVersion: this.serverVersion };
+        ws.send(JSON.stringify(welcome));
+        this.log(`bridge: extension connected (${peer}, key ${key!.id})`);
         return;
       }
 
@@ -273,7 +339,7 @@ export class BridgeServer {
         return;
       }
 
-      if (msg.type === 'result' && 'id' in msg) {
+      if (msg.type === 'result' && typeof msg.id === 'string') {
         const pending = this.pending.get(msg.id);
         if (pending) {
           clearTimeout(pending.timer);
@@ -292,14 +358,14 @@ export class BridgeServer {
           pending.resolve({
             markdown: msg.markdown,
             title: typeof msg.title === 'string' ? msg.title : '',
-            url: typeof msg.url === 'string' ? msg.url : '',
+            url: msg.url,
             charCount: msg.markdown.length,
           });
         }
         return;
       }
 
-      if (msg.type === 'error' && 'id' in msg && msg.id) {
+      if (msg.type === 'error' && typeof msg.id === 'string' && msg.id) {
         const pending = this.pending.get(msg.id);
         if (pending) {
           clearTimeout(pending.timer);
@@ -311,10 +377,10 @@ export class BridgeServer {
     });
 
     ws.on('close', () => {
-      clearTimeout(authTimeout);
+      clearTimeout(timer);
+      this.handshakes.delete(ws);
       if (this.client === ws) {
         this.client = null;
-        this.sessionToken = null;
         this.log('bridge: extension disconnected');
         // Its requests can no longer be answered: fail them now, not at their timeout.
         for (const [id, req] of this.pending) {
