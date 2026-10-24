@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.6.2 - 2026-10-24
+
+How a version mismatch or a key problem reaches the agent, from the review of the update system (T179).
+
+### Fixed
+
+- **The agent learns why the browser did not serve its page.** When this server refused an extension's handshake (a newer or older bridge protocol, no `PAGE2AI_BRIDGE_KEY`, a key it does not hold, a proof that does not match), no extension was connected, so `page_to_markdown` fetched the page by itself and said nothing: a page behind a sign-in came back as the sign-in page, and the reason was only in the MCP client's log. For five minutes after such a refusal (an extension with the switch on retries every 30 seconds), each result now carries one line after the Markdown, `Fetched without the browser: the Page2AI extension tried to connect …`, saying what to ask the user: quit and reopen the MCP client (a name-only `npx -y page2ai-mcp` then starts the newest server), update the extension, or copy the key from the popup. A pairing that succeeds clears it. The line is built from this server's own words and numbers only: any local program can send a `hello`, and nothing from its message reaches the agent.
+
+### Added
+
+- **`--version`** prints the version and exits before anything listens: `npx -y page2ai-mcp --version` shows which server a name-only install runs today.
+
+### Docs
+
+- README and llms-install.md: quitting and reopening the MCP client is the update; a version named in the config stays; agents should not pin a version or wrap `@page2ai/core` in their own package for a task (a `^0.x` range admits patches only), and can pass a local file's text as `html`.
+
 ## 0.6.1 - 2026-10-24
 
 Fixes from the review panel of 0.6.0.

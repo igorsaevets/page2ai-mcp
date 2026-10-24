@@ -250,6 +250,10 @@ export const handlePageToMarkdown = async (
       process.stderr.write(`[page2ai-mcp] bridge: ${msg}; fetching without the browser\n`);
       bridgeNote = `Fetched without the browser: the Page2AI extension answered ${msg}`;
     }
+  } else {
+    // A handshake this server refused leaves no connection: the note is the agent's only
+    // sign that the browser was meant to serve this page, and of what the user must fix.
+    bridgeNote = bridgeRef?.refusalNote() ?? null;
   }
 
   // --- Path 3: fetch + linkedom (current behavior) ---
