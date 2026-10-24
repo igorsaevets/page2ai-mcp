@@ -44,16 +44,27 @@ addresses via an undici `Agent`, so `fetch()` cannot re-resolve the hostname to 
 Extended blocklists cover multicast, broadcast, TEST-NET, NAT64, 6to4, Teredo, documentation and
 discard IPv6 ranges.
 
-## Agent Bridge (since 0.5.0)
+## Agent Bridge (since 0.5.0; paired by a key since 0.6.0)
 
 The server listens on `ws://127.0.0.1:3025` for the Page2AI browser extension, which can then open
-the pages the agent asks for in the user's own browser. It binds loopback only, accepts a `Host` of
-`127.0.0.1:<port>` or `localhost:<port>` only (DNS rebinding), and accepts the extension by its
-WebSocket `Origin`: Page2AI's Chrome Web Store ID, or an exact origin listed in
-`PAGE2AI_BRIDGE_ORIGINS` (0.5.0 to 0.5.2 accepted any `moz-extension://` origin, so any Firefox
-extension; fixed in 0.5.3). A web page or another browser extension cannot forge that origin;
-another program on the same computer can, so the bridge is no stronger than the local user account.
-In scope: a web page, a remote host, or another browser extension reaching the bridge.
+the pages the agent asks for in the user's own browser. It binds loopback only and accepts a `Host`
+of `127.0.0.1:<port>` or `localhost:<port>` only (DNS rebinding). The WebSocket `Origin` is a first
+filter: Page2AI's Chrome Web Store ID, an exact origin listed in `PAGE2AI_BRIDGE_ORIGINS`, or any
+`moz-extension://` origin (Firefox gives every install a random one).
+
+**Pairing (page2ai-bridge/2, since 0.6.0).** The extension makes a 32-byte random key; the user
+pastes it into this server's `PAGE2AI_BRIDGE_KEY`. On every connection the extension names the key
+by the first 16 hex digits of its SHA-256 and sends a nonce; the server answers with its own nonce
+and an HMAC-SHA256 over both nonces and its port; only if that checks out does the extension send
+its HMAC, and only then does the server give the connection its single slot. Without a key the
+server refuses every browser. This stops a program that listens on the port while no server runs
+(0.5.0 to 0.5.4: the extension obeyed it, opened the pages in the signed-in browser and sent their
+text back), a program that connects to the server without the key, other
+browser extensions, web pages, and a relay through another port. At most 4 connections may wait in
+the handshake, 5 s each. **Out of scope:** malware running as the same OS user, which can read the
+key from the MCP client's config or the browser profile.
+In scope: a web page, a remote host, another browser extension, another OS user, or a local program
+without the key reaching the bridge or posing as it.
 
 The SSRF guard applies through the bridge too (0.5.4; 0.5.0 to 0.5.3 sent private, loopback and
 metadata URLs to the extension): the URL is checked, DNS included, before the browser opens it, and

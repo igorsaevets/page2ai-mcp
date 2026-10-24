@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.6.0 - 2026-10-24
+
+### Security
+
+- **Agent Bridge pairs with a key (protocol `page2ai-bridge/2`).** Any local program could listen on port 3025 while no server ran, and the extension obeyed its `convert` with the user's signed-in browser; a program could also connect to the server under a forged `Origin`. The extension now makes a key, the user pastes it into `PAGE2AI_BRIDGE_KEY` (in the `.mcpb`: the *Agent Bridge key* setting), and on every connection both sides prove they know it with HMAC-SHA256 over two nonces and the port, the server first. Without a key the server connects no browser and says so in its log. A connection takes the single slot only after the proof; at most 4 wait in the handshake, 5 s each. Breaking: extensions speaking `page2ai-bridge/1` get `PROTOCOL_MISMATCH` (no released extension does).
+
+### Changed
+
+- **Firefox needs no origin setting.** Any `moz-extension://` origin may start the handshake and the key admits Page2AI; `PAGE2AI_BRIDGE_ORIGINS` remains for unpacked Chrome builds.
+- The per-session token of `page2ai-bridge/1` is gone: the authenticated connection is the session.
+
 ## 0.5.4 - 2026-10-23
 
 ### Security

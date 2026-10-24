@@ -18,6 +18,7 @@ import { Server } from '@modelcontextprotocol/server';
 import { handlePageToMarkdown, pageToMarkdownDefinition, setBridge } from './tools/page-to-markdown.js';
 import { BridgeServer } from './bridge/server.js';
 import { DEFAULT_BRIDGE_PORT } from './bridge/protocol.js';
+import { BRIDGE_KEY_ENV, parseBridgeKeys } from './bridge/keys.js';
 
 const SERVER_NAME = 'page2ai-mcp';
 
@@ -95,18 +96,21 @@ const handle = serveStdio(buildServer, {
 
 // --- Agent Bridge: localhost WS for the Page2AI browser extension ---
 // Starts only in local mode (not on Vercel/serverless). The extension connects
-// when the user enables "Agent Bridge" in its popup. When connected, the
-// page_to_markdown tool routes through the user's real browser.
+// when the user enables "Agent Bridge" in its popup and this server holds the key
+// the popup shows. When connected, page_to_markdown routes through the user's browser.
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 let bridge: BridgeServer | null = null;
 
 if (!isServerless) {
   const bridgePort = parseInt(process.env.PAGE2AI_BRIDGE_PORT ?? '', 10) || DEFAULT_BRIDGE_PORT;
-  // An unpacked or self-built extension has its own ID: list its exact origin(s),
-  // comma-separated, e.g. PAGE2AI_BRIDGE_ORIGINS=chrome-extension://<id>.
+  // An unpacked or self-built Chrome extension has its own ID: list its exact
+  // origin(s), comma-separated, e.g. PAGE2AI_BRIDGE_ORIGINS=chrome-extension://<id>.
   const extraOrigins = (process.env.PAGE2AI_BRIDGE_ORIGINS ?? '')
     .split(',').map((s) => s.trim()).filter(Boolean);
-  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log, extraOrigins });
+  // The key(s) the extension shows in its popup; without one the bridge refuses every browser.
+  const { keys, problems } = parseBridgeKeys(process.env[BRIDGE_KEY_ENV]);
+  for (const problem of problems) log(`${BRIDGE_KEY_ENV}: ${problem}; ignored`);
+  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log, extraOrigins, keys });
   setBridge(bridge);
 
   bridge.start().then(
