@@ -3,14 +3,20 @@ import type { BridgeServer } from '../src/bridge/server.js';
 
 // The tool resolves a name before handing it to the browser. Here: one public name, one
 // that resolves into a private range, and every other name unresolvable (it still goes to
-// the browser, which may reach it through a proxy). @page2ai/core's own fetch keeps the
-// real resolver, so its answer for these .invalid names is a DNS failure.
+// the browser, which may reach it through a proxy).
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(async (host: string) => {
     if (host === 'public.example.invalid') return [{ address: '93.184.215.14', family: 4 }];
     if (host === 'intranet.example.invalid') return [{ address: '10.1.2.3', family: 4 }];
     throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
   }),
+}));
+// The server's own fetch answers here. The real one resolved these .invalid names on the
+// machine's network, and a slow resolver failed this file once in five runs (T172).
+const ownFetch = vi.hoisted(() => vi.fn(async (url: string) => ({ markdown: `# Fetched by the server: ${url}` })));
+vi.mock('@page2ai/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@page2ai/core')>()),
+  fetchAndConvert: ownFetch,
 }));
 import { BridgeError } from '../src/bridge/protocol.js';
 import { handlePageToMarkdown, setBridge } from '../src/tools/page-to-markdown.js';
@@ -38,21 +44,25 @@ const answeringBridge = (landedUrl: string): BridgeServer & { calls: number } =>
   return bridge as unknown as BridgeServer & { calls: number };
 };
 
-// Passes the tool's check before the browser; the server's own fetch then fails on DNS
-// (its real resolver), which makes reaching the fetch route visible in the answer.
+// Passes the tool's check before the browser.
 const URL_FETCH_REFUSES = 'https://public.example.invalid/agent/asked';
+const FETCHED = `# Fetched by the server: ${URL_FETCH_REFUSES}`;
 
 const textOf = (result: Awaited<ReturnType<typeof handlePageToMarkdown>>): string =>
   result.content.map((c) => ('text' in c ? c.text : '')).join('\n');
 
 describe('page_to_markdown with a refusing bridge', () => {
-  afterEach(() => setBridge(null));
+  afterEach(() => {
+    setBridge(null);
+    ownFetch.mockClear();
+  });
 
   it('falls back to its own fetch on PERMISSION_REQUIRED and says why', async () => {
     setBridge(refusingBridge('PERMISSION_REQUIRED', 'Page2AI has no access to 127.0.0.1'));
     const result = await handlePageToMarkdown({ url: URL_FETCH_REFUSES });
     const text = textOf(result);
-    expect(text).toContain('DNS resolution failed for "public.example.invalid"');
+    expect(ownFetch).toHaveBeenCalledTimes(1);
+    expect(text).toContain(FETCHED);
     expect(text).toContain('Fetched without the browser: the Page2AI extension answered PERMISSION_REQUIRED');
     expect(text).not.toContain('Bridge conversion failed');
   });
@@ -63,12 +73,14 @@ describe('page_to_markdown with a refusing bridge', () => {
     expect(result.isError).toBe(true);
     expect(textOf(result)).toMatch(/^Bridge conversion failed: TIMEOUT/);
     expect(textOf(result)).not.toContain('SSRF');
+    expect(ownFetch).not.toHaveBeenCalled();
   });
 
   it('decides by the code, not the wording: a failed tab load worded «timed out» still falls back', async () => {
     setBridge(refusingBridge('EXTRACTION_FAILED', 'Tab load timed out'));
     const text = textOf(await handlePageToMarkdown({ url: URL_FETCH_REFUSES }));
-    expect(text).toContain('DNS resolution failed for "public.example.invalid"');
+    expect(ownFetch).toHaveBeenCalledTimes(1);
+    expect(text).toContain(FETCHED);
     expect(text).toContain('Fetched without the browser: the Page2AI extension answered EXTRACTION_FAILED: Tab load timed out');
   });
 });
