@@ -1,7 +1,7 @@
 # llms-install.md — AI-agent install guide for page2ai-mcp
 
 You are an AI agent installing the **page2ai** MCP server for your user. Everything you
-need is below; no account, no build step. Exactly one optional environment variable exists — the Agent Bridge pairing key (below); the server works without it.
+need is below; no account, no build step. One optional environment variable matters here — the Agent Bridge pairing key (below); the server works without it.
 
 ## What you are installing
 
@@ -71,8 +71,8 @@ With 1.6.0 present, ask the user to:
 1. Open the Page2AI popup, turn on *Agent Bridge* and allow access to websites.
 2. Use *Copy key* in that section and give you the key — or paste it themselves into this
    server's config as the `PAGE2AI_BRIDGE_KEY` environment variable (in Claude Desktop's
-   `.mcpb` install, the *Agent Bridge key* setting). That variable is the only one this
-   server takes; never add any other.
+   `.mcpb` install, the *Agent Bridge key* setting). That is the only variable you should
+   ever set for it; never add any other.
 3. Restart the MCP client fully. Afterwards `url` pages open in a background tab of the
    user's browser while the extension is connected; the server falls back to its own
    fetch, with a note, for any page the extension declines.
@@ -99,7 +99,7 @@ With 1.6.0 present, ask the user to:
 
 - Install is fully reversible: the mirror command is `claude mcp remove page2ai` /
   `codex mcp remove page2ai` / `agy mcp remove page2ai`, or deleting the JSON entry.
-- The only environment variable this server takes is `PAGE2AI_BRIDGE_KEY` (optional, above). Never add any other variable or secret to its config.
+- The only environment variable you should ever set for this server is `PAGE2AI_BRIDGE_KEY` (optional, above). It also honours `PAGE2AI_BRIDGE_PORT` and `PAGE2AI_BRIDGE_ORIGINS` for unpacked builds and tests — never set those for a user, and never add any secret to its config.
 - Source: https://github.com/igorsaevets/page2ai-mcp · npm: `page2ai-mcp` (wrapper)
   around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp). Releases are
   published from GitHub Actions with npm provenance; verify with `npm audit signatures`.
