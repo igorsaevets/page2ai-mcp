@@ -20,7 +20,7 @@ npm run build
 npm run probe      # protocol smoke test against dist/
 ```
 
-To try it against a real client, point Claude Desktop or Claude Code at `node dist/index.js` (stdio), or use `npx page2ai-mcp`.
+To try it against a real client, point Claude Desktop or Claude Code at `node dist/index.js` (stdio), or use `npx -y page2ai-mcp`.
 
 ## Protocol note
 

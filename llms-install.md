@@ -1,14 +1,15 @@
 # llms-install.md — AI-agent install guide for page2ai-mcp
 
 You are an AI agent installing the **page2ai** MCP server for your user. Everything you
-need is below; no account, no API key, no environment variables, no build step.
+need is below; no account, no build step. Exactly one optional environment variable exists — the Agent Bridge pairing key (below); the server works without it.
 
 ## What you are installing
 
 - A **stdio MCP server** started with: `npx -y page2ai-mcp`
 - Requirement: **Node.js 20+** on the user's machine (`node --version` to check).
-- It exposes one read-only tool, `page_to_markdown(url)` — fetches a web page and
-  returns clean Markdown with YAML front matter.
+- It exposes one read-only tool, `page_to_markdown`: with `url` it fetches a web page;
+  with `html` (a page's HTML, with its `url` as the base for links) it converts what you
+  hand it and fetches nothing. Either way it returns clean Markdown with YAML front matter.
 - The only network requests it ever makes are to the URLs passed in. No telemetry.
 - First run downloads ~30 MB into the npm cache (a few seconds on a normal
   connection); later runs start instantly.
@@ -16,8 +17,9 @@ need is below; no account, no API key, no environment variables, no build step.
 ## Install commands per client
 
 Run the ONE command matching the client you are running inside, or edit the config file
-where noted. Do not run `npx -y page2ai-mcp` bare in a terminal — it waits silently on
-stdin for an MCP client; that is normal, not a hang.
+where noted. Do not run `npx -y page2ai-mcp` bare in a terminal to test it: it prints
+`[page2ai-mcp] server <version> ready on stdio` plus two Agent Bridge lines to stderr,
+then waits on stdin for an MCP client; that is normal, not a hang.
 
 | Client | How |
 |---|---|
@@ -55,6 +57,26 @@ Domain"`, `source`, `captured_at`, `extractor: "page2ai-core"`), followed by a s
 `# Example Domain` heading and one paragraph. If you get that, the install works —
 tell the user it is ready.
 
+## Optional: Agent Bridge (pages behind a sign-in or rendered by JavaScript)
+
+The server fetches without cookies and runs no page scripts. If the user wants it to read
+such a page through their own browser instead, the Page2AI browser extension can serve it —
+but only **extension 1.6.0 or later**: the stores currently serve 1.5.1, whose popup has no
+Agent Bridge switch. If the popup has no *Agent Bridge* section, do not invent one and do
+not tell the user to look for it; say the extension must be updated first (the browser does
+it on its own within a day) and use the `html` argument meanwhile.
+
+With 1.6.0 present, ask the user to:
+
+1. Open the Page2AI popup, turn on *Agent Bridge* and allow access to websites.
+2. Use *Copy key* in that section and give you the key — or paste it themselves into this
+   server's config as the `PAGE2AI_BRIDGE_KEY` environment variable (in Claude Desktop's
+   `.mcpb` install, the *Agent Bridge key* setting). That variable is the only one this
+   server takes; never add any other.
+3. Restart the MCP client fully. Afterwards `url` pages open in a background tab of the
+   user's browser while the extension is connected; the server falls back to its own
+   fetch, with a note, for any page the extension declines.
+
 ## Troubleshooting
 
 - **Tool missing after install** — config-file clients need a full app restart
@@ -77,7 +99,7 @@ tell the user it is ready.
 
 - Install is fully reversible: the mirror command is `claude mcp remove page2ai` /
   `codex mcp remove page2ai` / `agy mcp remove page2ai`, or deleting the JSON entry.
-- Never add environment variables or secrets to this server's config — it takes none.
+- The only environment variable this server takes is `PAGE2AI_BRIDGE_KEY` (optional, above). Never add any other variable or secret to its config.
 - Source: https://github.com/igorsaevets/page2ai-mcp · npm: `page2ai-mcp` (wrapper)
   around [`@page2ai/mcp`](https://www.npmjs.com/package/@page2ai/mcp). Releases are
   published from GitHub Actions with npm provenance; verify with `npm audit signatures`.

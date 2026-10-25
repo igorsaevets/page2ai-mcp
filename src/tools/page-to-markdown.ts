@@ -24,7 +24,7 @@ const URL_TEXT =
 const HTML_TEXT =
   'Raw HTML of the page to convert instead of fetching it, e.g. from a browser tool. ' +
   'Pass the page\'s `url` with it so relative links resolve. Either `url` or `html` is required.';
-const BRIDGE_SETTINGS_TEXT = ' Through Agent Bridge the extension\'s own output settings apply instead.';
+const BRIDGE_SETTINGS_TEXT = ' Applies on every path, including through Agent Bridge.';
 
 export const pageToMarkdownInputSchema = z.object({
   url: z.string().url().optional().describe(URL_TEXT),
@@ -58,7 +58,9 @@ export const pageToMarkdownDefinition = {
     'rendered only by JavaScript comes back as its login page or with no content. For those, ' +
     'pass the page HTML you already have from a browser tool as `html` (with its `url`, relative ' +
     'links resolve and nothing is fetched), or ask the user to turn on Agent Bridge in the ' +
-    'Page2AI browser extension: while it is connected, `url` pages open in the user\'s own ' +
+    'Page2AI browser extension 1.6.0 or later (if its popup has no Agent Bridge switch, ' +
+    'that install is an older store version and the extension must be updated first): ' +
+    'while it is connected, `url` pages open in the user\'s own ' +
     'browser with its cookies and scripts, and a page the extension declines is fetched by the ' +
     'server, with a note saying why. ' +
     'It requests only the URL given, as a browser opens a page, so docs sites return the page ' +
