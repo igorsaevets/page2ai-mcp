@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.6.3 - 2026-10-25
+
+The bridge texts stop sending users of the store extension to a switch that is not in it yet (BL-58 gate 1(a), 1(c)).
+
+### Fixed
+
+- **Every bridge instruction now names extension 1.6.0.** The stores serve 1.5.1, which has no Agent Bridge switch and no key to copy, but the tool description told agents to "ask the user to turn on Agent Bridge", the startup log told them to copy the key from the popup, and each refusal note said the same. All of them now say 1.6.0 or later and what an older install means: if the popup has no Agent Bridge section, the extension must be updated first. `llms-install.md` says the same and no longer forbids the one environment variable the bridge needs.
+- **The schema no longer claims the extension's own output settings apply through the bridge.** Since extension 1.6.0 the bridge stages the call's own `include_images` and `include_frontmatter`; both descriptions now say they apply on every path.
+
 ## 0.6.2 - 2026-10-24
 
 How a version mismatch or a key problem reaches the agent, from the review of the update system (T179).

@@ -179,8 +179,8 @@ The server fetches without cookies and runs no page scripts. For a page that nee
 - **Or turn on Agent Bridge** in the Page2AI extension (1.6.0 or later): popup → *Agent Bridge*
   switch → allow access to websites. While the extension is connected, `url` pages open in a
   background tab of your own browser, with its cookies and scripts, and come back as the
-  extension's Markdown (its own output settings apply, not `include_images` /
-  `include_frontmatter`). The extension refuses sign-in providers' pages and anything that is
+  extension's Markdown (the call's `include_images` and `include_frontmatter` are honoured
+  there, not the popup's). The extension refuses sign-in providers' pages and anything that is
   not http(s); a page it refuses is fetched by the server as usual, with a second text block
   saying why; when the browser ends on another page (a sign-in redirect), a second text block
   names the page it got. Private, loopback and cloud metadata addresses are refused before the
@@ -191,7 +191,7 @@ The server fetches without cookies and runs no page scripts. For a page that nee
   *Agent Bridge* on → *Copy key*. Give it to this server as `PAGE2AI_BRIDGE_KEY`: in Claude Desktop
   (the `.mcpb` extension) paste it into Page2AI's setting *Agent Bridge key*; in a JSON config add
   `"env": { "PAGE2AI_BRIDGE_KEY": "<key>" }` to the server entry; with Claude Code,
-  `claude mcp add page2ai -e PAGE2AI_BRIDGE_KEY=<key> -- npx -y @page2ai/mcp`. Restart the MCP
+  `claude mcp add page2ai -e PAGE2AI_BRIDGE_KEY=<key> -- npx -y page2ai-mcp`. Restart the MCP
   client after. Several browsers or profiles: put their keys in the one variable, separated by
   commas; the first to connect holds the bridge. Several MCP clients running Page2AI (Claude
   Desktop and Cursor, say): the one started first holds port 3025 and the others run without the

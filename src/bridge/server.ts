@@ -35,8 +35,10 @@ export const PAGE2AI_CHROME_ORIGIN = 'chrome-extension://dlpaaijcnbbmlfeohlphjpn
 
 const MAX_HANDSHAKES = 4;
 const HANDSHAKE_MS = 5000;
-const HOW_TO_ADD_KEY = 'copy the key from the Page2AI popup (Agent Bridge, Copy key) into ' +
-  `${BRIDGE_KEY_ENV} in this server's settings, then restart the MCP client`;
+const HOW_TO_ADD_KEY = 'in the Page2AI browser extension 1.6.0 or later, turn on Agent Bridge in its popup ' +
+  'and copy the key it shows (Copy key) into ' +
+  `${BRIDGE_KEY_ENV} in this server's settings, then restart the MCP client. ` +
+  'If the popup has no Agent Bridge section, that install is an older store version (1.5.1 or earlier): update the extension first';
 
 const isWebUrl = (url: string): boolean => {
   try {
@@ -126,14 +128,14 @@ export class BridgeServer {
             'user to update the Page2AI extension (the browser does it within a day; chrome://extensions with ' +
             'Developer mode on has an Update button).';
       case 'NO_KEY':
-        return `${lead}, but this server has no ${BRIDGE_KEY_ENV}. Ask the user to copy the key from the ` +
-          `Page2AI popup into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
+        return `${lead}, but this server has no ${BRIDGE_KEY_ENV}. Ask the user to copy the key from the extension 1.6.0+ popup (no Agent Bridge section there means the extension must be updated first) ` +
+          `into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
       case 'UNKNOWN_KEY':
-        return `${lead} with a key this server does not hold. Ask the user to copy the key from the Page2AI ` +
-          `popup into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
+        return `${lead} with a key this server does not hold. Ask the user to copy the key from the extension 1.6.0+ popup (no Agent Bridge section there means the extension must be updated first) ` +
+          `into the MCP server's ${BRIDGE_KEY_ENV} setting, then ${restart}.`;
       case 'AUTH_FAILED':
-        return `${lead}, but its proof did not match the key this server holds. Ask the user to copy the key ` +
-          `from the Page2AI popup into the MCP server's ${BRIDGE_KEY_ENV} setting again, then ${restart}.`;
+        return `${lead}, but its proof did not match the key this server holds. Ask the user to copy the key from the extension 1.6.0+ popup (no Agent Bridge section there means the extension must be updated first) ` +
+          `into the MCP server's ${BRIDGE_KEY_ENV} setting again, then ${restart}.`;
     }
   }
 
