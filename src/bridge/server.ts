@@ -105,6 +105,11 @@ export class BridgeServer {
     return this.client !== null && this.client.readyState === WebSocket.OPEN;
   }
 
+  /** A key from PAGE2AI_BRIDGE_KEY is set: without one the bridge refuses every extension. */
+  hasKey(): boolean {
+    return this.keys.length > 0;
+  }
+
   /** One line for the agent's result when an extension tried to connect within
    *  REFUSAL_NOTE_MS and this server refused it: the tool then fetches by itself, and
    *  without the line the agent cannot tell that the browser was meant to serve it, nor

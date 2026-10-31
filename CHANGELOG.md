@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## Unreleased (0.7.0)
+
+Results an agent can act on without a person watching (BL-59 b, c, f; T200 measurements). The hosted endpoint's contract is unchanged.
+
+### Added
+
+- **Long pages come back in parts.** The local tool takes `max_length` (default 30,000 characters, about 8,000 tokens: under Claude Code's 10,000-token warning) and `start_index`. A part ends at a block boundary, never inside a code block or the frontmatter, and never right after a heading. The first part of a long page ends with a note naming the next `start_index` and a list of the page's sections as `start_index (length): heading`, so an agent can read the one section it needs. Later parts come from the text the first part was cut from, kept in the server's memory for 10 minutes after the last part was read: no new request to the site, no second tab in the user's browser through Agent Bridge, and offsets that do not move. A page that fits in one part comes back exactly as before. Measured: Python's built-in types page, 285,604 characters in one result on 0.6.3, now comes as a 29,662-character first part with a 1,278-character list of sections.
+- **Every dead end names the next step.** The error's first line stays as before; a second line says what to do: an HTTP 401/403 (npm, Stack Overflow, Medium and OpenAI refuse the server, T200) points to the page's HTML from a browser tool as `html` or to Agent Bridge, and says the same request will be refused again; 404 and 410 say there is no page there; 429 says to wait; 5xx to try later; a timeout names a larger `timeout_ms`; a PDF or other non-page type, the 10 MB cap and a redirect loop say so. A host name that does not resolve no longer reads only as an address-guard block. A successful result with no readable text (a page built by scripts, such as reddit) and a fetch that landed on a sign-in page carry a note with the same next steps; HTML with no text in it gets a note asking for the rendered DOM.
+- **The bridge state is in the next step.** A server whose bridge could not start (its port held by another Page2AI server) says Agent Bridge is not available to it, and why; a bridge without `PAGE2AI_BRIDGE_KEY` says the key is needed.
+- **Server `instructions`.** A 365-character text tells a client what the server is for: Claude Code reads it to decide when to look for the tool once tool search has deferred it.
+
+### Changed
+
+- `@page2ai/core` range raised to `^0.3.2`, so a warm npx cache picks up core 0.3.2 with this release.
+- The Registry entry declares `PAGE2AI_BRIDGE_KEY` (optional, secret), and its website is the documentation page. `PAGE2AI_BRIDGE_PORT` and `PAGE2AI_BRIDGE_ORIGINS` stay undeclared on purpose: the extension connects to port 3025 only, and a client that shows declared variables as settings would invite a user to break the bridge.
+
 ## 0.6.3 - 2026-10-25
 
 The bridge texts stop sending users of the store extension to a switch that is not in it yet (BL-58 gate 1(a), 1(c)).

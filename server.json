@@ -7,7 +7,7 @@
     "url": "https://github.com/igorsaevets/page2ai-mcp",
     "source": "github"
   },
-  "websiteUrl": "https://github.com/igorsaevets/page2ai-mcp#readme",
+  "websiteUrl": "https://igorsaevets.github.io/page2ai-docs/mcp/",
   "version": "0.6.3",
   "packages": [
     {
@@ -16,7 +16,15 @@
       "version": "0.6.3",
       "transport": {
         "type": "stdio"
-      }
+      },
+      "environmentVariables": [
+        {
+          "name": "PAGE2AI_BRIDGE_KEY",
+          "description": "Optional. The key the Page2AI browser extension (1.6.0 or later) shows in its popup under Agent Bridge. With it, pages open in the user's own browser with its cookies; without it, the server fetches pages itself. Several keys: comma-separated.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
     }
   ]
 }
