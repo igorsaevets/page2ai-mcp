@@ -1,0 +1,32 @@
+{
+  "name": "page2ai",
+  "displayName": "Page2AI",
+  "description": "Convert a web page URL (or HTML you already have) to clean Markdown for LLM context: headings, code blocks with language hints, tables and tab panels kept, navigation dropped. Runs the page2ai-mcp server locally through npx; with the optional Agent Bridge key, pages open in your own browser with its cookies.",
+  "author": {
+    "name": "Igor Saevets",
+    "url": "https://github.com/igorsaevets"
+  },
+  "homepage": "https://igorsaevets.github.io/page2ai-docs/",
+  "repository": "https://github.com/igorsaevets/page2ai-mcp",
+  "license": "MIT",
+  "keywords": ["markdown", "web", "html-to-markdown", "llm-context", "documentation", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "page2ai": {
+      "command": "npx",
+      "args": ["-y", "page2ai-mcp"],
+      "env": {
+        "PAGE2AI_BRIDGE_KEY": "${user_config.bridge_key}"
+      }
+    }
+  },
+  "userConfig": {
+    "bridge_key": {
+      "type": "string",
+      "title": "Agent Bridge key (optional)",
+      "description": "Leave empty unless you want pages to open in your own browser. In the Page2AI browser extension 1.6.0 or later: open its popup, turn on Agent Bridge, allow site access, press Copy key, and paste the key here.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}

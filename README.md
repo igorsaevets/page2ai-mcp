@@ -56,6 +56,16 @@ can.
 claude mcp add page2ai -- npx -y page2ai-mcp
 ```
 
+Or install the Claude Code plugin, which adds the same server plus a skill that tells the agent when to
+use it and what to do with signed-in, blocked and very long pages (Claude Code 2.1.275 or later):
+
+```text
+/plugin install page2ai --marketplace igorsaevets/page2ai-mcp
+```
+
+It asks for one optional, secret setting, the Agent Bridge key (see below). In `claude -p` runs allow the
+tool by name: `--allowedTools "mcp__plugin_page2ai_page2ai__page_to_markdown"`.
+
 ### Claude Desktop
 
 One-click bundle: download `page2ai-mcp-<version>.mcpb` from the

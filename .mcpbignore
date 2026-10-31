@@ -14,6 +14,10 @@ tsconfig*.json
 remote/
 wrapper/
 
+# The Claude Code plugin and its marketplace (installed from git, not from the bundle)
+.claude-plugin/
+plugins/
+
 # Repo metadata not needed at runtime
 .github/
 .gitignore
