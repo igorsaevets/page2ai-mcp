@@ -10,11 +10,15 @@
   "repository": "https://github.com/igorsaevets/page2ai-mcp",
   "license": "MIT",
   "keywords": ["markdown", "web", "html-to-markdown", "llm-context", "documentation", "mcp"],
+  "icon": "./icon.png",
+  "documentationUrl": "https://igorsaevets.github.io/page2ai-docs/mcp/",
+  "supportUrl": "https://github.com/igorsaevets/page2ai-mcp/issues",
+  "privacyPolicyUrl": "https://igorsaevets.github.io/page2ai-docs/privacy/",
   "skills": "./skills/",
   "mcpServers": {
     "page2ai": {
       "command": "npx",
-      "args": ["-y", "page2ai-mcp"],
+      "args": ["-y", "page2ai-mcp@0.6.3"],
       "env": {
         "PAGE2AI_BRIDGE_KEY": "${user_config.bridge_key}"
       }
@@ -26,7 +30,8 @@
       "title": "Agent Bridge key (optional)",
       "description": "Leave empty unless you want pages to open in your own browser. In the Page2AI browser extension 1.6.0 or later: open its popup, turn on Agent Bridge, allow site access, press Copy key, and paste the key here.",
       "sensitive": true,
-      "required": false
+      "required": false,
+      "default": ""
     }
   }
 }

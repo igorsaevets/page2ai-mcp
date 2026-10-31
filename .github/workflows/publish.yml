@@ -160,6 +160,18 @@ jobs:
             exit 1
           fi
 
+      # The Claude Code plugin starts the server through npx pinned to one release
+      # (Anthropic's plugin directory refuses an unpinned launcher), so a release
+      # that leaves the pin behind keeps every plugin user on the previous server.
+      - name: Check the Claude Code plugin's pinned server
+        run: |
+          PIN="$(node -p "require('./plugins/page2ai/.claude-plugin/plugin.json').mcpServers.page2ai.args.join(' ')")"
+          MAIN="$(node -p "require('./package.json').version")"
+          if [ "$PIN" != "-y page2ai-mcp@$MAIN" ]; then
+            echo "::error::plugins/page2ai/.claude-plugin/plugin.json runs npx '$PIN'; expected '-y page2ai-mcp@$MAIN'"
+            exit 1
+          fi
+
       - name: Pack both packages
         id: pack
         # npm pack runs no script of either package (neither has prepack,
