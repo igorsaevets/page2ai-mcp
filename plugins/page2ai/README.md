@@ -20,6 +20,13 @@ To install it in Claude Code from this repository's own marketplace:
 /plugin install page2ai --marketplace igorsaevets/page2ai-mcp
 ```
 
+## Examples
+
+- "Read https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap with Page2AI and show me its code examples."
+- "Convert https://docs.python.org/3/library/json.html to Markdown with Page2AI and list the functions it documents, with their signatures."
+- "Save https://en.wikipedia.org/wiki/Markdown as Markdown in markdown-article.md, using Page2AI."
+- With a browser tool open on a page: "Take this page's HTML and convert it with Page2AI, passing the page's URL too."
+
 ## What it runs, fetches and sends
 
 - **Runs** the open-source page2ai-mcp server on your computer through `npx`, pinned to one release in the plugin's manifest. When that release is not in npm's cache yet, npx downloads it and its dependencies from the npm registry.
