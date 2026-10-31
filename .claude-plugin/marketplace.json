@@ -1,0 +1,15 @@
+{
+  "name": "page2ai",
+  "description": "Page2AI for Claude Code: web page to clean Markdown for agents.",
+  "owner": {
+    "name": "Igor Saevets",
+    "url": "https://github.com/igorsaevets"
+  },
+  "plugins": [
+    {
+      "name": "page2ai",
+      "source": "./plugins/page2ai",
+      "description": "Web page to clean Markdown for agents: the page2ai-mcp server plus a skill that says when to use it and what to do with signed-in, blocked and very long pages."
+    }
+  ]
+}
