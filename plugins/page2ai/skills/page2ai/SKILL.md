@@ -7,7 +7,9 @@ description: Convert a web page to clean Markdown with Page2AI's page_to_markdow
 
 ## The tool
 
-`page_to_markdown`, served by the `page2ai` MCP server (this plugin starts it with `npx -y page2ai-mcp`).
+`page_to_markdown`, served by the `page2ai` MCP server (this plugin starts it with `npx`, pinned to one `page2ai-mcp` release in the plugin's manifest).
+
+claude.ai chat does not start local MCP servers, so there the tool is not among your tools. Say so instead of guessing a page's content, and use whatever fetch tool you do have.
 
 | Argument | Default | Meaning |
 |---|---|---|
@@ -40,7 +42,7 @@ With it, `url` pages open in the user's own Chrome, with its cookies and scripts
 
 1. Install the Page2AI extension 1.6.0 or later (Chrome Web Store ID `dlpaaijcnbbmlfeohlphjpnbbcnomnno`).
 2. In its popup: turn on Agent Bridge, allow site access, press Copy key.
-3. Save the key as this plugin's `bridge_key` option (`/plugin`, then Page2AI, then configure), or as `PAGE2AI_BRIDGE_KEY` in the server's environment when it was added without the plugin. Restart the MCP server.
+3. Save the key as this plugin's `bridge_key` option (`/plugin`, then Page2AI, then configure), or as `PAGE2AI_BRIDGE_KEY` in the server's environment when it was added without the plugin. Restart the MCP server. Cowork does not ask for plugin options, so there the plugin runs without the bridge.
 
 While the bridge is connected, a page the extension declines is fetched by the server, and the result says why. Only one server process per machine can hold the bridge port (127.0.0.1:3025): with several MCP clients open, the one started first gets the browser and the others fetch by themselves.
 
@@ -49,7 +51,7 @@ While the bridge is connected, a page the extension declines is fetched by the s
 - `claude -p` runs start in Manual mode (Claude Code 2.1.302 and later): a call that needs approval is denied, not asked, unless the tool is allowed. With this plugin the tool is `mcp__plugin_page2ai_page2ai__page_to_markdown`; added with `claude mcp add page2ai ...` it is `mcp__page2ai__page_to_markdown`. Example: `claude -p "Summarize https://example.com/ from its Markdown" --allowedTools "mcp__plugin_page2ai_page2ai__page_to_markdown"`. With `--permission-mode auto` a classifier reviews each call instead.
 - The server connects to sites directly. It does not read `HTTPS_PROXY` or `HTTP_PROXY` (measured on 0.6.3), so behind a proxy that is the only way out (many corporate networks and self-hosted CI runners) its fetches fail. Pass `html` from a browser tool there.
 - Sandboxes that allow only listed domains need the page's domain on that list; the tool cannot get around it.
-- `npx -y page2ai-mcp` picks up a new release when the server starts. A pinned version or a global install stays on its version.
+- This plugin runs the `page2ai-mcp` release pinned in its manifest; a new release reaches you when the plugin updates. A server added as `npx -y page2ai-mcp`, with no version, picks up a new release when it starts; a global install stays on its version.
 
 ## Package names
 
