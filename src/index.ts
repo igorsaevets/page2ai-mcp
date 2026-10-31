@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { Server } from '@modelcontextprotocol/server';
-import { handlePageToMarkdown, pageToMarkdownDefinition, setBridge } from './tools/page-to-markdown.js';
+import { LOCAL_SERVE, handlePageToMarkdown, pageToMarkdownDefinition, setBridge } from './tools/page-to-markdown.js';
 import { BridgeServer } from './bridge/server.js';
 import { DEFAULT_BRIDGE_PORT } from './bridge/protocol.js';
 import { BRIDGE_KEY_ENV, parseBridgeKeys } from './bridge/keys.js';
@@ -41,6 +41,16 @@ const SERVER_VERSION = ((): string => {
   }
 })();
 
+// Claude Code reads server instructions to decide when to look for a server's tools once tool
+// search has deferred them, and cuts them at 4,096 characters (code.claude.com/docs/en/mcp,
+// «Tool search for MCP server authors», read 2026-10-31). Every session that connects the
+// server pays for them, so they stay short: what the tool is for, and when to reach for it.
+const INSTRUCTIONS =
+  'Page2AI reads web pages as clean Markdown. Use page_to_markdown when a task needs the text of a web ' +
+  'page (documentation, an article, a README, a reference page), or Markdown from HTML you already have, ' +
+  'e.g. from a browser tool. A long page comes back in parts with a list of its sections to jump to; when ' +
+  'a site refuses the server, the result says what to try next.';
+
 // Log to stderr — stdio transport uses stdout for JSON-RPC frames, so anything
 // written to stderr is safe (Claude Desktop logs it to the debug console).
 const log = (msg: string): void => {
@@ -65,6 +75,7 @@ const buildServer = (): Server => {
       capabilities: {
         tools: {},
       },
+      instructions: INSTRUCTIONS,
     },
   );
 
@@ -76,7 +87,7 @@ const buildServer = (): Server => {
     const toolName = request.params.name;
     const toolArgs = request.params.arguments ?? {};
     if (toolName === 'page_to_markdown') {
-      return handlePageToMarkdown(toolArgs);
+      return handlePageToMarkdown(toolArgs, LOCAL_SERVE);
     }
     return {
       isError: true,
@@ -123,9 +134,13 @@ if (!isServerless) {
   bridge.start().then(
     () => log(`bridge ready on ws://127.0.0.1:${bridgePort}`),
     (err: unknown) => {
-      log(`bridge failed to start: ${err instanceof Error ? err.message : String(err)} (the server continues without it)`);
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`bridge failed to start: ${msg} (the server continues without it)`);
       bridge = null;
-      setBridge(null);
+      // The agent learns why the switch in the extension cannot help this server.
+      setBridge(null, (err as NodeJS.ErrnoException | null)?.code === 'EADDRINUSE'
+        ? `port ${bridgePort} is held by another program, most likely another Page2AI server, which the extension connects to instead`
+        : `it failed to start (${msg})`);
     },
   );
 }

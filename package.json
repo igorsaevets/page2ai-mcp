@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@page2ai/core": "^0.3.1",
+    "@page2ai/core": "^0.3.2",
     "ws": "^8.22.0",
     "zod": "^4.2.0"
   },
