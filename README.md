@@ -178,6 +178,37 @@ command per client and a verification step.
 |------|-------------|-----------|---------|
 | `page_to_markdown` | Fetch a web page URL, or take its HTML, and convert to clean Markdown | ✅ | `page_to_markdown(url="https://docs.anthropic.com/en/api/messages")` |
 
+### Long pages (0.7.0 and later)
+
+A page longer than `max_length` characters (default 30,000, about 8,000 tokens) comes back in
+parts. A part ends between blocks: never inside a code block or the frontmatter, and never right
+after a heading. The first part ends with a note naming the `start_index` of the next part,
+followed by the page's sections as `start_index (length): heading`, so an agent can read the one
+section it needs:
+
+```text
+page_to_markdown(url="https://docs.python.org/3/library/stdtypes.html")                 → part 1 and the sections
+page_to_markdown(url="https://docs.python.org/3/library/stdtypes.html", start_index=N)  → the part from N
+```
+
+Later parts come from the text the first part was cut from, kept in the server's memory for 10
+minutes after the last part was read: the site gets no new request, Agent Bridge opens no second
+tab, and offsets do not move. A page that fits in one part comes back exactly as before. Python's
+built-in types page, about 286,000 characters in one result up to 0.6.3, now comes as a first part
+of under 30,000 characters plus a list of its sections. The hosted endpoint returns whole pages.
+
+### When a page cannot be read (0.7.0 and later)
+
+A fetch error keeps its first line and adds a second one with the next step. HTTP 401 and 403
+(on 2026-10-30, npm, Stack Overflow, Medium and OpenAI refused the server's requests): pass the
+page's HTML from a browser tool as `html`, or turn on Agent Bridge, since the same request will be
+refused again; the step names `PAGE2AI_BRIDGE_KEY` when the server has no key, and says so when
+another Page2AI server holds the bridge port. 404 and 410: check the URL. 429: wait. 5xx: try
+later. A timeout: a larger `timeout_ms`. A PDF or another type that is not a page, the 10 MB cap
+and a redirect loop name themselves, and a host name that does not resolve says so instead of
+reading like an address-guard block. A page with no readable text (built by scripts in the
+browser) and a fetch that landed on a sign-in page come back with a note giving the same steps.
+
 ### Pages behind a sign-in or rendered by JavaScript
 
 The server fetches without cookies and runs no page scripts. For a page that needs either:
@@ -277,9 +308,11 @@ No setup required — every argument has a sensible default. `page_to_markdown` 
 | `include_images` | boolean | `true` | Keep `![alt](src)` image references in the output |
 | `include_frontmatter` | boolean | `true` | Prepend the YAML front matter block |
 | `timeout_ms` | integer | `15000` | Abort the fetch after N ms (1000–60000) |
+| `max_length` | integer | `30000` | Characters per part (100–1000000); a longer page comes back in parts |
+| `start_index` | integer | `0` | Character offset to read from: the next part, or a section from the first part's list |
 
-The hosted endpoint takes `url` only (the contract its ChatGPT plugin was reviewed with) and
-caps `timeout_ms` at 20000.
+The hosted endpoint takes `url` only (the contract its ChatGPT plugin was reviewed with), caps
+`timeout_ms` at 20000 and returns whole pages.
 
 Environment variables of the local server, all optional:
 
@@ -297,6 +330,9 @@ Planned: a `profile` argument (`auto | docs | marketing | research | dashboard |
 beyond the URLs you explicitly provide. Note that your AI client (Claude, ChatGPT, …)
 still sends the extracted Markdown to its own model provider under that client's privacy
 policy — that part is outside this server's control. See [PRIVACY.md](./PRIVACY.md) for details.
+
+A long page's Markdown stays in the server's memory while its parts are read, until 10 minutes
+after the last part was read or until the server stops; nothing is written to disk.
 
 With Agent Bridge on, the extension sends this server the URL's Markdown as your browser
 renders it, signed-in content included, over a WebSocket on 127.0.0.1; nothing else leaves

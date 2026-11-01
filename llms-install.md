@@ -61,8 +61,9 @@ tell the user it is ready.
 
 The server fetches without cookies and runs no page scripts. If the user wants it to read
 such a page through their own browser instead, the Page2AI browser extension can serve it —
-but only **extension 1.6.0 or later**: the stores currently serve 1.5.1, whose popup has no
-Agent Bridge switch. If the popup has no *Agent Bridge* section, do not invent one and do
+but only **extension 1.6.0 or later**: the Chrome Web Store serves 1.6.0 since 2026-10-26, while
+Firefox Add-ons still serves 1.5.1, whose popup has no Agent Bridge switch. If the popup has no
+*Agent Bridge* section, do not invent one and do
 not tell the user to look for it; say the extension must be updated first (the browser does
 it on its own within a day) and use the `html` argument meanwhile.
 
@@ -93,7 +94,12 @@ With 1.6.0 present, ask the user to:
   user to upgrade Node.js, do not try to patch around it.
 - **Corporate proxy / offline** — the server itself is local, but it downloads from
   the npm registry on first run and fetches the pages you request; both need network
-  access.
+  access. Its page fetches do not go through `HTTPS_PROXY` or `HTTP_PROXY`, so where every
+  request must pass a proxy, pass the page's HTML from a browser tool as `html` instead.
+- **A long page** comes back in parts (0.7.0 and later): the note at the end of a part
+  names the `start_index` of the next one, and the first part lists the page's sections.
+- **An error has a second line** (0.7.0 and later) with the next step: follow it instead of
+  repeating the same call.
 
 ## Scope notes for agents
 

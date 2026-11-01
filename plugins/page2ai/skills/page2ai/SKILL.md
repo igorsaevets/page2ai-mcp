@@ -18,23 +18,28 @@ claude.ai chat does not start local MCP servers, so there the tool is not among 
 | `include_frontmatter` | `true` | YAML block first: title, source, captured_at, language, canonical, extractor_version |
 | `include_images` | `true` | Keep `![alt](src)` image references |
 | `timeout_ms` | `15000` | 1000 to 60000 |
+| `max_length` | `30000` | 100 to 1000000. A longer page comes back in parts |
+| `start_index` | `0` | Character offset to read from: the next part, or one section |
 
 Code blocks keep their language, tables stay tables, and tab panels come out as `### Tab: <label>` sections instead of one merged block.
 
 ## Picking the input
 
 1. A public page: call it with `url`.
-2. The result is a sign-in page, a cookie wall, an "enable JavaScript" shell or almost empty, or the call fails with HTTP 403 or 429: the server fetched without the user's cookies and ran no page scripts.
+2. The result is a sign-in page, a cookie wall, an "enable JavaScript" shell or almost empty, or the call fails with HTTP 403 or 429: the server fetched without the user's cookies and ran no page scripts. The error's second line, or a note after the page, names the next step this server can offer; it knows whether Agent Bridge is set up.
    - If a browser tool has that page open, take its HTML (`document.documentElement.outerHTML`) and call again with `html` and `url`.
    - Otherwise ask the user once to set up Agent Bridge (below); after that, `url` pages open in their browser.
 3. A refusal (403, 429, a CAPTCHA, a paywall) is the site's answer. Do not retry it with other headers, in a loop, or through another service.
+4. Other errors say what to do as well: a 404 is a wrong address, a 429 means wait, a timeout means a larger `timeout_ms`, a PDF is not a page this tool reads.
 
 ## Long pages
 
-The whole page comes back in one result; there is no paging argument. Reference pages are large: Python's built-in types page returned about 286,000 characters (measured 2026-10-30).
+A page longer than `max_length` comes back in parts. Reference pages are large: Python's built-in types page is about 286,000 characters, ten parts at the default 30,000 (about 8,000 tokens each). A part ends between blocks, never inside a code block and never right after a heading.
 
-- Claude Code saves a text result over 50,000 characters to a file and gives you its path. Read that file in ranges, or search its headings (lines starting with `#`), instead of loading all of it.
-- In any client, convert one page per call and keep only the sections the task needs.
+- The first part ends with a note: how to get the next part, then the page's sections as `start_index (length): heading`. Read the list first and fetch only the sections the task needs: call again with the same arguments, a section's `start_index`, and its length as `max_length`.
+- For the next part, call again with the same arguments and the `start_index` the note names. The server keeps the page's Markdown for 10 minutes after the last part read, so later parts come from the same copy: the site is not asked again, and offsets do not move. After that, a later part comes from a new copy, and its note says so. With `html`, the note says whether to send the HTML again.
+- A larger `max_length` returns more per call. Claude Code saves a text result over 50,000 characters to a file and gives you its path: read that file in ranges instead of loading all of it.
+- A table cut between two parts has no header row in the later part.
 
 ## Agent Bridge (optional, set up once by the user)
 
@@ -44,12 +49,12 @@ With it, `url` pages open in the user's own Chrome, with its cookies and scripts
 2. In its popup: turn on Agent Bridge, allow site access, press Copy key.
 3. Save the key as this plugin's `bridge_key` option (`/plugin`, then Page2AI, then configure), or as `PAGE2AI_BRIDGE_KEY` in the server's environment when it was added without the plugin. Restart the MCP server. Cowork does not ask for plugin options, so there the plugin runs without the bridge.
 
-While the bridge is connected, a page the extension declines is fetched by the server, and the result says why. Only one server process per machine can hold the bridge port (127.0.0.1:3025): with several MCP clients open, the one started first gets the browser and the others fetch by themselves.
+While the bridge is connected, a page the extension declines is fetched by the server, and the result says why. Only one server process per machine can hold the bridge port (127.0.0.1:3025): with several MCP clients open, the one started first gets the browser and the others fetch by themselves and say so when a page needs the browser.
 
 ## Running unattended
 
 - `claude -p` runs start in Manual mode (Claude Code 2.1.302 and later): a call that needs approval is denied, not asked, unless the tool is allowed. With this plugin the tool is `mcp__plugin_page2ai_page2ai__page_to_markdown`; added with `claude mcp add page2ai ...` it is `mcp__page2ai__page_to_markdown`. Example: `claude -p "Summarize https://example.com/ from its Markdown" --allowedTools "mcp__plugin_page2ai_page2ai__page_to_markdown"`. With `--permission-mode auto` a classifier reviews each call instead.
-- The server connects to sites directly. It does not read `HTTPS_PROXY` or `HTTP_PROXY` (measured on 0.6.3), so behind a proxy that is the only way out (many corporate networks and self-hosted CI runners) its fetches fail. Pass `html` from a browser tool there.
+- The server connects to sites directly. It does not read `HTTPS_PROXY` or `HTTP_PROXY` (measured on 0.7.0), so behind a proxy that is the only way out (many corporate networks and self-hosted CI runners) its fetches fail. Pass `html` from a browser tool there.
 - Sandboxes that allow only listed domains need the page's domain on that list; the tool cannot get around it.
 - This plugin runs the `page2ai-mcp` release pinned in its manifest; a new release reaches you when the plugin updates. A server added as `npx -y page2ai-mcp`, with no version, picks up a new release when it starts; a global install stays on its version.
 

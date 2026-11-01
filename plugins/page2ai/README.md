@@ -2,7 +2,7 @@
 
 Page2AI converts a web page to clean Markdown for Claude. Code blocks keep their language, tables stay tables, tab panels come out as separate sections, and navigation menus are dropped. Give it a URL, or the HTML of a page that a browser tool already has open, and Claude gets the page's full text instead of a summary.
 
-The plugin adds one tool, `page_to_markdown`, and a skill that tells Claude when to use it, what to do when a site refuses the request, and how to handle very long pages.
+The plugin adds one tool, `page_to_markdown`, and a skill that tells Claude when to use it, what to do when a site refuses the request, and how to read a long page in parts. A long page comes back in parts of about 8,000 tokens, the first one listing the page's sections, so Claude can read only the section it needs.
 
 ## Where it works
 
@@ -32,6 +32,7 @@ To install it in Claude Code from this repository's own marketplace:
 - **Runs** the open-source page2ai-mcp server on your computer through `npx`, pinned to one release in the plugin's manifest. When that release is not in npm's cache yet, npx downloads it and its dependencies from the npm registry.
 - **Fetches** each page Claude asks for, directly from your computer, with a plain HTTP request: no cookies, no page scripts. Private, loopback and cloud-metadata addresses are refused.
 - **Listens** on 127.0.0.1, port 3025, reachable from your computer only, for the Page2AI browser extension's Agent Bridge. Without a bridge key it refuses every connection.
+- **Keeps** a long page's Markdown in the server's memory while Claude reads it in parts, until 10 minutes after the last part was read or until the server stops. Nothing is written to disk.
 - **Sends** nothing anywhere else: no telemetry, no analytics, no account. The Markdown goes only to the Claude session that called the tool.
 
 ## Optional: open pages in your own browser (Agent Bridge)

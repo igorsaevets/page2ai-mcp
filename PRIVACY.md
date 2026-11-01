@@ -1,13 +1,13 @@
 # Page2AI MCP Server — Privacy Policy
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-31
 **Applies to:** `@page2ai/mcp` npm package v0.1.0+
 
 ## What data this MCP server collects
 
 **None.**
 
-`@page2ai/mcp` is a stateless local Node.js process. When invoked with a URL:
+`@page2ai/mcp` is a local Node.js process. When invoked with a URL:
 
 1. It fetches the URL via Node's built-in `fetch()` API, following its redirects
 2. Parses the HTML response via [linkedom](https://github.com/WebReflection/linkedom) (a lightweight in-memory DOM parser)
@@ -15,11 +15,15 @@
 4. Returns the Markdown to the calling MCP client (Claude Desktop, Cursor, Windsurf, Zed, VS Code, etc.)
 
 The server does not:
-- Store any content on disk beyond ephemeral memory during processing
+- Store any content on disk
 - Send telemetry, analytics, crash reports, or any other data to any third party
 - Maintain user accounts, API keys, or authentication state
-- Track requests or responses across invocations
+- Track requests or responses across invocations, apart from the copy of a long page described under "Long pages" below
 - Log requests or responses to any location outside the calling MCP client's own logs
+
+## Long pages (since 0.7.0)
+
+When a page's Markdown is longer than one part (`max_length`, 30,000 characters unless the call asks for another size), the server keeps that Markdown in its own memory, so the next parts come from the same text instead of a new request to the site. A kept page is dropped 10 minutes after its last part was read, when more than 8 pages or 16 million characters are kept (the oldest goes first), or when the server process exits. It is never written to disk and goes only to the MCP client that asks for a part of it. A page that fits in one part, and HTML passed without a `url`, are not kept.
 
 ## What data the MCP client may log
 
