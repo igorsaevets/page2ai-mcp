@@ -215,6 +215,21 @@ describe('page_to_markdown in parts (local server)', () => {
     expect(texts(second)[0]).toMatch(/^## Part \d+/);
     expect(ownFetch).not.toHaveBeenCalled();
   });
+
+  it('converts html sent with a start_index instead of an older copy of the same url', async () => {
+    // The fetch of `url` is kept; the caller then has the signed-in page from a browser tool.
+    const note = texts(await handlePageToMarkdown({ url }, LOCAL_SERVE))[1]!;
+    const next = Number(/start_index (\d+)/.exec(note)![1]);
+    const html = `<html><body><h1>Signed in</h1>${Array.from({ length: 400 }, (_, i) => `<h2>Row ${i}</h2><p>${'word '.repeat(60)}</p>`).join('')}</body></html>`;
+    const r = await handlePageToMarkdown({ url, html, start_index: next }, LOCAL_SERVE);
+    expect(texts(r)[0]).not.toContain('Section');
+    expect(texts(r)[0]).toMatch(/## Row \d+/);
+    // From then on that HTML is the kept copy, so a part without html continues it.
+    const more = Number(/Next part: start_index (\d+)/.exec(texts(r)[1]!)![1]);
+    const after = await handlePageToMarkdown({ url, start_index: more }, LOCAL_SERVE);
+    expect(texts(after)[0]).toMatch(/## Row \d+/);
+    expect(ownFetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('page_to_markdown says what to do next', () => {

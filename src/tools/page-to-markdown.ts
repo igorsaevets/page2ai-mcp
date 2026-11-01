@@ -247,7 +247,9 @@ export const handlePageToMarkdown = async (
   };
 
   // A later part of a long page comes from the text its first part was cut from (paging.ts).
-  if (parts.start > 0 && parts.key) {
+  // HTML given with the call is converted instead: it is what the caller has now, and the
+  // kept copy of the same url may come from a fetch or from other HTML.
+  if (parts.start > 0 && parts.key && input.html === undefined) {
     const kept = keptPage(parts.key);
     if (kept !== undefined) return partOf(kept, [], parts);
   }
