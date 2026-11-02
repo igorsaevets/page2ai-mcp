@@ -13,6 +13,7 @@
 
 export const BRIDGE_PROTOCOL = 'page2ai-bridge/2';
 export const DEFAULT_BRIDGE_PORT = 3025;
+export const BRIDGE_PORT_RANGE = 8;
 
 /** A bridge failure with the protocol's code (TIMEOUT, PERMISSION_REQUIRED, ...).
  *  Callers decide by `code`; the message is for people and may change. */

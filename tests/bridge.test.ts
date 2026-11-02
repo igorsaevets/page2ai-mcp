@@ -523,3 +523,72 @@ describe('parseBridgeKeys', () => {
     expect(problems[0]).not.toContain(secretish);
   });
 });
+
+describe('BridgeServer auto-port (port range)', () => {
+  const servers: BridgeServer[] = [];
+
+  afterEach(async () => {
+    await Promise.all(servers.map((s) => s.stop()));
+    servers.length = 0;
+  });
+
+  const startOnPort = async (port: number): Promise<BridgeServer> => {
+    const s = new BridgeServer({ port, serverVersion: '0.0.1-test', log, keys: asKeys(KEY) });
+    await s.start();
+    servers.push(s);
+    return s;
+  };
+
+  it('a second server binds to the next port when the first holds its port', async () => {
+    const s1 = await startOnPort(TEST_PORT);
+    const s2 = await startOnPort(TEST_PORT + 1);
+    expect(s1.isConnected()).toBe(false);
+    expect(s2.isConnected()).toBe(false);
+
+    // Both accept WebSocket connections on their own ports.
+    const ws1 = await connect(TEST_PORT);
+    const ws2 = await connect(TEST_PORT + 1);
+    ws1.close();
+    ws2.close();
+    await closed(ws1);
+    await closed(ws2);
+  });
+
+  it('EADDRINUSE on a taken port', async () => {
+    await startOnPort(TEST_PORT);
+    const dup = new BridgeServer({ port: TEST_PORT, serverVersion: '0.0.1-test', log, keys: asKeys(KEY) });
+    await expect(dup.start()).rejects.toThrow(/EADDRINUSE/);
+  });
+
+  it('extension can pair with two servers on different ports simultaneously', async () => {
+    await startOnPort(TEST_PORT);
+    await startOnPort(TEST_PORT + 1);
+
+    // Pair with server 1
+    const ws1 = await connect(TEST_PORT);
+    const nonceE1 = hello(ws1, KEY);
+    const ch1 = await readMsg(ws1);
+    expect(ch1.type).toBe('challenge');
+    const proof1 = clientProofFor(KEY, TEST_PORT, ch1.nonceS as string, nonceE1);
+    ws1.send(JSON.stringify({ type: 'auth', proof: proof1 }));
+    const w1 = await readMsg(ws1);
+    expect(w1.type).toBe('welcome');
+
+    // Pair with server 2
+    const ws2 = await connect(TEST_PORT + 1);
+    const nonceE2 = hello(ws2, KEY);
+    const ch2 = await readMsg(ws2);
+    expect(ch2.type).toBe('challenge');
+    const proof2 = clientProofFor(KEY, TEST_PORT + 1, ch2.nonceS as string, nonceE2);
+    ws2.send(JSON.stringify({ type: 'auth', proof: proof2 }));
+    const w2 = await readMsg(ws2);
+    expect(w2.type).toBe('welcome');
+
+    // Both connected
+    expect(servers[0].isConnected()).toBe(true);
+    expect(servers[1].isConnected()).toBe(true);
+
+    ws1.close();
+    ws2.close();
+  });
+});
