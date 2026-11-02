@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.8.0 - 2026-11-02
+
+Multiple MCP clients (Claude Desktop, Cursor, `claude -p`) can now share the user's browser through Agent Bridge simultaneously.
+
+### Changed
+
+- **Auto-port selection.** When `PAGE2AI_BRIDGE_PORT` is not set, the bridge tries ports 3025 through 3032 in order instead of only 3025. The first free port wins. A second Page2AI server started while the first is running picks the next port; the extension (1.7.0 or later) scans the range and connects to all of them. Explicit `PAGE2AI_BRIDGE_PORT` still uses only that port (backward compat).
+- The Claude Code plugin runs `page2ai-mcp@0.8.0`.
+
 ## 0.7.0 - 2026-11-02
 
 Results an agent can act on without a person watching (BL-59 b, c, f; T200 measurements). The hosted endpoint's contract is unchanged.
