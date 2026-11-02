@@ -17,7 +17,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { Server } from '@modelcontextprotocol/server';
 import { LOCAL_SERVE, handlePageToMarkdown, pageToMarkdownDefinition, setBridge } from './tools/page-to-markdown.js';
 import { BridgeServer } from './bridge/server.js';
-import { DEFAULT_BRIDGE_PORT } from './bridge/protocol.js';
+import { DEFAULT_BRIDGE_PORT, BRIDGE_PORT_RANGE } from './bridge/protocol.js';
 import { BRIDGE_KEY_ENV, parseBridgeKeys } from './bridge/keys.js';
 
 const SERVER_NAME = 'page2ai-mcp';
@@ -120,7 +120,7 @@ const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NA
 let bridge: BridgeServer | null = null;
 
 if (!isServerless) {
-  const bridgePort = parseInt(process.env.PAGE2AI_BRIDGE_PORT ?? '', 10) || DEFAULT_BRIDGE_PORT;
+  const explicitPort = parseInt(process.env.PAGE2AI_BRIDGE_PORT ?? '', 10);
   // An unpacked or self-built Chrome extension has its own ID: list its exact
   // origin(s), comma-separated, e.g. PAGE2AI_BRIDGE_ORIGINS=chrome-extension://<id>.
   const extraOrigins = (process.env.PAGE2AI_BRIDGE_ORIGINS ?? '')
@@ -128,21 +128,53 @@ if (!isServerless) {
   // The key(s) the extension shows in its popup; without one the bridge refuses every browser.
   const { keys, problems } = parseBridgeKeys(process.env[BRIDGE_KEY_ENV]);
   for (const problem of problems) log(`${BRIDGE_KEY_ENV}: ${problem}; ignored`);
-  bridge = new BridgeServer({ port: bridgePort, serverVersion: SERVER_VERSION, log, extraOrigins, keys });
-  setBridge(bridge);
 
-  bridge.start().then(
-    () => log(`bridge ready on ws://127.0.0.1:${bridgePort}`),
-    (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      log(`bridge failed to start: ${msg} (the server continues without it)`);
-      bridge = null;
-      // The agent learns why the switch in the extension cannot help this server.
-      setBridge(null, (err as NodeJS.ErrnoException | null)?.code === 'EADDRINUSE'
-        ? `port ${bridgePort} is held by another program, most likely another Page2AI server, which the extension connects to instead`
-        : `it failed to start (${msg})`);
-    },
-  );
+  const makeBridge = (port: number): BridgeServer =>
+    new BridgeServer({ port, serverVersion: SERVER_VERSION, log, extraOrigins, keys });
+
+  if (explicitPort) {
+    // User pinned a specific port — use it or fail.
+    bridge = makeBridge(explicitPort);
+    setBridge(bridge);
+    bridge.start().then(
+      () => log(`bridge ready on ws://127.0.0.1:${explicitPort}`),
+      (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        log(`bridge failed to start: ${msg} (the server continues without it)`);
+        bridge = null;
+        setBridge(null, (err as NodeJS.ErrnoException | null)?.code === 'EADDRINUSE'
+          ? `port ${explicitPort} is held by another program`
+          : `it failed to start (${msg})`);
+      },
+    );
+  } else {
+    // Try ports in order: the first free port wins. Multiple MCP clients
+    // (Claude Desktop, Cursor, claude -p) each get their own port; the
+    // extension scans the range and connects to all of them.
+    (async () => {
+      const lastPort = DEFAULT_BRIDGE_PORT + BRIDGE_PORT_RANGE - 1;
+      for (let port = DEFAULT_BRIDGE_PORT; port <= lastPort; port++) {
+        const candidate = makeBridge(port);
+        try {
+          await candidate.start();
+          bridge = candidate;
+          setBridge(bridge);
+          return;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+            log(`bridge: port ${port} in use, trying next`);
+            continue;
+          }
+          const msg = err instanceof Error ? err.message : String(err);
+          log(`bridge failed to start: ${msg} (the server continues without it)`);
+          setBridge(null, `it failed to start (${msg})`);
+          return;
+        }
+      }
+      log(`bridge: all ports ${DEFAULT_BRIDGE_PORT}-${lastPort} in use (the server continues without it)`);
+      setBridge(null, `all bridge ports (${DEFAULT_BRIDGE_PORT}-${lastPort}) are held by other programs`);
+    })();
+  }
 }
 
 log(`server ${SERVER_VERSION} ready on stdio (tools: page_to_markdown)`);
