@@ -5,7 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
-## 0.7.0 - 2026-10-31
+## 0.7.0 - 2026-11-02
 
 Results an agent can act on without a person watching (BL-59 b, c, f; T200 measurements). The hosted endpoint's contract is unchanged.
 
