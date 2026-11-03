@@ -15,18 +15,20 @@ const sha12 = (s: string): string => createHash('sha256').update(s, 'utf8').dige
 describe('hosted page_to_markdown = the contract reviewed for the ChatGPT plugin', () => {
   it('keeps the reviewed description byte for byte', () => {
     const d = pageToMarkdownHostedDefinition.description;
-    expect([sha12(d), d.length]).toEqual(['783d1e41f68e', 898]);
+    expect([sha12(d), d.length]).toEqual(['2b2d5ad05e9e', 996]);
   });
 
-  it('takes a url and the three options, and nothing else', () => {
+  it('takes a url, query and the three options, and nothing else', () => {
     expect(Object.keys(pageToMarkdownHostedInputSchema.shape)).toEqual([
-      'url', 'include_images', 'include_frontmatter', 'timeout_ms',
+      'url', 'query', 'include_images', 'include_frontmatter', 'timeout_ms',
     ]);
     expect(pageToMarkdownHostedInputSchema.safeParse({}).success).toBe(false);
     expect(pageToMarkdownHostedInputSchema.safeParse({ html: '<p>x</p>' }).success).toBe(false);
     const parsed = pageToMarkdownHostedInputSchema.parse({ url: 'https://example.com', html: '<p>x</p>' });
     expect(parsed).not.toHaveProperty('html');
     expect(pageToMarkdownHostedInputSchema.safeParse({ url: 'https://example.com', timeout_ms: 60001 }).success).toBe(false);
+    const withQuery = pageToMarkdownHostedInputSchema.parse({ url: 'https://example.com', query: 'install' });
+    expect(withQuery.query).toBe('install');
   });
 
   it('keeps name, title and annotations', () => {
@@ -43,5 +45,7 @@ describe('hosted page_to_markdown = the contract reviewed for the ChatGPT plugin
     expect(d).toContain('Agent Bridge');
     expect(d).toContain('not a Markdown copy of it');
     expect(pageToMarkdownHostedDefinition.description).not.toMatch(/bridge|extension|`html`/i);
+    expect(pageToMarkdownHostedDefinition.description).toContain('query');
+    expect(pageToMarkdownHostedDefinition.description).toContain('BM25');
   });
 });

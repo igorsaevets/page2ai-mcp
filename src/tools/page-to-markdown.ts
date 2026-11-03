@@ -163,14 +163,18 @@ export const pageToMarkdownDefinition = {
   },
 };
 
-// The hosted endpoint (remote/) serves the contract OpenAI reviewed for the ChatGPT plugin
-// (approved 2026-09-11). OpenAI rescans the live server and, after its automated checks,
-// replaces a reviewed tool definition with the changed one, so editing these strings changes
-// what ChatGPT runs. They stay the 0.4.1 definition: a URL only (no `html`) and no Agent
-// Bridge, which a hosted server can never reach. tests/hosted-contract.test.ts pins them.
+// The hosted endpoint (remote/) serves the contract for directory-reviewed plugins
+// (ChatGPT approved 2026-09-11). OpenAI rescans the live server and, after its automated
+// checks, replaces a reviewed tool definition with the changed one. The hosted contract
+// exposes url + query (BM25 search) but not html, max_length, start_index or Agent Bridge
+// (which a hosted server can never reach). tests/hosted-contract.test.ts pins the schema.
 export const pageToMarkdownHostedInputSchema = z.object({
   url: z.string().url().describe(
     'Absolute HTTP or HTTPS URL of the web page to convert. Blocks private ranges, loopback, and cloud metadata endpoints.',
+  ),
+  query: z.string().max(1000).optional().describe(
+    'A free-text query to filter the page by relevance. When given, only the sections whose text ' +
+    'matches the query are returned, ranked by BM25. For the full page, omit this parameter.',
   ),
   include_images: z.boolean().optional().default(true).describe(
     'Include image references (![alt](src)) in the output. Default: true.',
@@ -198,6 +202,7 @@ export const pageToMarkdownHostedDefinition = {
     'README.md, an llms.txt) comes back as written. ' +
     'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
     'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
+    'Pass `query` to search a page by relevance: only the matching sections come back, ranked by BM25. ' +
     'Zero external API calls — parses locally via linkedom.',
   annotations: pageToMarkdownDefinition.annotations,
 };
@@ -221,9 +226,9 @@ export const setBridge = (bridge: BridgeServer | null, unavailable: string | nul
 
 // What the local stdio server adds to the shared handler (src/index.ts passes it): a page size
 // for a call that names none, and next steps that name `html` and Agent Bridge. The hosted
-// endpoint (remote/) calls the handler without it: its reviewed contract has no `max_length`,
-// `start_index` or `html` and no bridge, so an agent there could never ask for a next part;
-// it keeps whole pages, and next steps it can follow.
+// endpoint (remote/) calls the handler without it: its contract has no `max_length`,
+// `start_index` or `html` and no bridge; it keeps whole pages (query mode returns all
+// matching sections), and next steps name what the local server can do.
 export interface ServeOptions {
   defaultMaxLength?: number;
   local?: boolean;
@@ -434,8 +439,9 @@ const withNotes = (text: string, notes: string[]): PageToMarkdownResult => ({
 // with no word about parts.
 const partOf = (text: string, notes: string[], parts: Parts): PageToMarkdownResult => {
   // Query mode: return only sections matching the query, ranked by BM25.
-  if (parts.query && parts.maxLength !== undefined) {
-    const ranked = querySections(text, parts.query, parts.maxLength);
+  // When max_length is unset (hosted endpoint), return all matching sections.
+  if (parts.query) {
+    const ranked = querySections(text, parts.query, parts.maxLength ?? text.length);
     if (ranked) {
       const body = ranked.sections.map((s) => s.text).join('\n\n');
       return withNotes(body, [...notes, ranked.note]);
