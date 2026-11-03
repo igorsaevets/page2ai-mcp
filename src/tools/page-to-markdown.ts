@@ -26,6 +26,7 @@ import {
   keepPage,
   keptPage,
   sectionList,
+  tableHeaderAt,
 } from './paging.js';
 import { NO_BODY_MARKER, looksLikeSignin, nextStepForError } from './next-steps.js';
 
@@ -339,12 +340,16 @@ export const handlePageToMarkdown = async (
       includeFrontmatter: input.include_frontmatter,
     });
     const notes: string[] = [];
-    // core's baseUrl is the address the fetch ended on, or a <base href> the page names, so
-    // only a landing that looks like a sign-in page is reported; a moved page keeps its new
-    // address in the frontmatter's `source`.
-    if (pageOf(result.baseUrl) !== pageOf(url) && looksLikeSignin(result.baseUrl, result.title)) {
-      notes.push(`The request was redirected to ${result.baseUrl}, which looks like a sign-in page: ` +
-        `the page needs the user's session. ${browserStep(serve)}`);
+    // core's baseUrl is the address the fetch ended on (or a <base href> the page names).
+    // A redirect is always reported: the agent needs to know which page it got, whether or
+    // not the landing is a sign-in page (the bridge path has done this since 0.5.3).
+    if (result.baseUrl && pageOf(result.baseUrl) !== pageOf(url)) {
+      if (looksLikeSignin(result.baseUrl, result.title)) {
+        notes.push(`The request was redirected to ${result.baseUrl}, which looks like a sign-in page: ` +
+          `the page needs the user's session. ${browserStep(serve)}`);
+      } else {
+        notes.push(`The page redirected to ${result.baseUrl}; the Markdown is of that page.`);
+      }
     }
     if (result.markdown.includes(NO_BODY_MARKER)) {
       notes.push('No readable text came out of this page: it is probably built by scripts in the browser, ' +
@@ -420,7 +425,9 @@ const partOf = (text: string, notes: string[], parts: Parts): PageToMarkdownResu
   const end = maxLength === undefined ? text.length : cutAt(text, start, maxLength);
   if (start === 0 && end === text.length) return withNotes(text, notes);
   if (parts.key && end < text.length) keepPage(parts.key, text);
-  return withNotes(text.slice(start, end), [...notes, partNote(text, start, end, parts.again)]);
+  const header = start > 0 ? tableHeaderAt(text, start) : null;
+  const part = header ? header + text.slice(start, end) : text.slice(start, end);
+  return withNotes(part, [...notes, partNote(text, start, end, parts.again)]);
 };
 
 const partNote = (text: string, start: number, end: number, again: Parts['again']): string => {
