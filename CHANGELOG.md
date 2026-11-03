@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.9.0 - 2026-11-03
+
+### Added
+
+- **`query` parameter (BM25 local search).** When the agent passes a free-text `query`, only
+  the page sections whose text matches the query are returned, ranked by BM25 relevance and
+  fitted into `max_length`. No external API call — scoring is local. This saves agents
+  50–200K tokens on large documentation pages (Python stdtypes 285K chars, MDN Array 72K)
+  by returning only the sections that answer the question.
+
 ## 0.8.3 - 2026-11-03
 
 ### Changed

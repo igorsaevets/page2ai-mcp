@@ -210,3 +210,90 @@ export const keptPage = (key: string, now = Date.now()): string | undefined => {
 export const forgetKeptPages = (): void => {
   kept.clear();
 };
+
+// --- Query mode (BL-59 q): return only sections that match a free-text query ---
+
+import { bm25 } from './bm25.js';
+
+export interface RankedSection extends Section {
+  score: number;
+  text: string;
+}
+
+/**
+ * Sections of `text` ranked by BM25 relevance to `query`, fitted into
+ * `maxLength` characters. Returns them in page order (the agent reads top
+ * to bottom), with a summary note.
+ *
+ * For scoring, each section is the text between its heading and the NEXT
+ * heading at any level — not the hierarchical span `sectionsOf` computes.
+ * A parent heading scored on its children's text would return the whole
+ * subtree and defeat the point of filtering.
+ */
+export const querySections = (
+  text: string,
+  query: string,
+  maxLength: number,
+): { sections: RankedSection[]; totalSections: number; note: string } | null => {
+  const allSections = sectionsOf(text);
+  if (allSections.length === 0) return null;
+
+  // Build flat section bodies: each section's text runs from its heading
+  // to the next heading (any level), not to the next same-level heading.
+  interface FlatSection { section: Section; body: string; ownLength: number }
+  const docs: FlatSection[] = [];
+
+  // Preamble: text before the first heading (frontmatter excluded).
+  const firstAt = allSections[0]!.at;
+  if (firstAt > 0) {
+    let preamble = text.slice(0, firstAt);
+    if (preamble.startsWith('---\n')) {
+      const end = preamble.indexOf('\n---', 4);
+      if (end >= 0) preamble = preamble.slice(end + 4).trimStart();
+    }
+    if (preamble.trim().length > 0) {
+      docs.push({
+        section: { level: 0, title: '(preamble)', at: 0, length: firstAt },
+        body: preamble.trim(),
+        ownLength: preamble.trim().length,
+      });
+    }
+  }
+
+  // Sort all sections by their position so we can find the next heading.
+  const sorted = [...allSections].sort((a, b) => a.at - b.at);
+  for (let i = 0; i < sorted.length; i++) {
+    const s = sorted[i]!;
+    const nextAt = i + 1 < sorted.length ? sorted[i + 1]!.at : text.length;
+    const body = text.slice(s.at, nextAt);
+    if (body.trim().length === 0) continue;
+    docs.push({ section: s, body, ownLength: nextAt - s.at });
+  }
+
+  if (docs.length === 0) return null;
+
+  const scored = bm25(query, docs.map((d) => d.body));
+  if (scored.length === 0) return null;
+
+  // Collect top-scoring sections that fit in maxLength, in page order.
+  const picked: RankedSection[] = [];
+  let usedChars = 0;
+
+  for (const { index, score } of scored) {
+    const doc = docs[index]!;
+    if (usedChars + doc.ownLength > maxLength && picked.length > 0) continue;
+    picked.push({ ...doc.section, score, text: doc.body });
+    usedChars += doc.ownLength;
+    if (usedChars >= maxLength) break;
+  }
+
+  // Sort by page position so the agent reads in order.
+  picked.sort((a, b) => a.at - b.at);
+
+  const note =
+    `Showing ${picked.length} of ${allSections.length} sections matching "${query}" ` +
+    `(${usedChars.toLocaleString('en')} characters). ` +
+    'For the full page, call again without `query`.';
+
+  return { sections: picked, totalSections: allSections.length, note };
+};

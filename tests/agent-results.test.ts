@@ -383,3 +383,110 @@ describe('page_to_markdown says what to do next', () => {
     expect(texts(await handlePageToMarkdown({ url }, LOCAL_SERVE))).toHaveLength(1);
   });
 });
+
+// --- Query mode (BL-59 q): return only sections matching a free-text query ---
+
+describe('query mode', () => {
+  const queryMarkdown =
+    '---\ntitle: "Docs"\nsource: "https://docs.example.invalid/api"\n---\n\n' +
+    '# API Reference\n\nOverview of the API.\n\n' +
+    '## Authentication\n\nUse an API key in the Authorization header.\n\n' +
+    '## Rate Limiting\n\nThe API allows 100 requests per minute per key.\n\n' +
+    '## Pagination\n\nResults are paginated. Use `page` and `per_page` query parameters.\n\n' +
+    '## Error Handling\n\nErrors return a JSON object with `error` and `message` fields.\n\n' +
+    '## Webhooks\n\nConfigure webhooks to receive events. POST payloads include a signature header.\n';
+
+  const mockFetchQuery = () =>
+    ownFetch.mockImplementation(async () => ({
+      markdown: queryMarkdown,
+      title: 'Docs',
+      baseUrl: 'https://docs.example.invalid/api',
+    }));
+
+  it('returns only matching sections when query is given', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'rate limiting requests per minute' },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    expect(t[0]).toContain('Rate Limiting');
+    expect(t[0]).toContain('100 requests per minute');
+    expect(t[0]).not.toContain('Webhooks');
+    expect(t.some((n) => n.includes('sections matching'))).toBe(true);
+  });
+
+  it('returns the full page when no sections match', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'elephant migration patterns' },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    expect(t[0]).toContain('API Reference');
+    expect(t.some((n) => n.includes('No sections matched'))).toBe(true);
+  });
+
+  it('ignores start_index when query is given', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'authentication API key', start_index: 999 },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    expect(t[0]).toContain('Authentication');
+  });
+
+  it('returns multiple matching sections in page order', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'API requests key' },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    const authPos = t[0]!.indexOf('Authentication');
+    const ratePos = t[0]!.indexOf('Rate Limiting');
+    if (authPos >= 0 && ratePos >= 0) {
+      expect(authPos).toBeLessThan(ratePos);
+    }
+  });
+
+  it('returns webhooks section for a specific query', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'webhooks signature' },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    expect(t[0]).toContain('Webhooks');
+    expect(t[0]).toContain('signature header');
+  });
+
+  it('respects max_length with query', async () => {
+    mockFetchQuery();
+    const result = await handlePageToMarkdown(
+      { url: 'https://docs.example.invalid/api', query: 'API', max_length: 200 },
+      LOCAL_SERVE,
+    );
+    const t = texts(result);
+    expect(t[0]!.length).toBeGreaterThan(0);
+    expect(t[0]!.length).toBeLessThanOrEqual(500);
+  });
+
+  it('schema accepts the query parameter', async () => {
+    const { pageToMarkdownInputSchema } = await import('../src/tools/page-to-markdown.js');
+    const parsed = pageToMarkdownInputSchema.parse({
+      url: 'https://example.com',
+      query: 'test query',
+    });
+    expect(parsed.query).toBe('test query');
+  });
+
+  it('schema rejects query over 1000 chars', async () => {
+    const { pageToMarkdownInputSchema } = await import('../src/tools/page-to-markdown.js');
+    expect(() => pageToMarkdownInputSchema.parse({
+      url: 'https://example.com',
+      query: 'x'.repeat(1001),
+    })).toThrow();
+  });
+});

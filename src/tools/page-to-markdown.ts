@@ -25,6 +25,7 @@ import {
   cutAt,
   keepPage,
   keptPage,
+  querySections,
   sectionList,
   tableHeaderAt,
 } from './paging.js';
@@ -44,10 +45,15 @@ const MAX_LENGTH_TEXT =
 const START_INDEX_TEXT =
   'Character offset to read from: the start_index a part named for the next one, or a section\'s from the list ' +
   `on the first part. Later parts come from the text the first part was cut from, kept for ${KEEP_MINUTES} minutes.`;
+const QUERY_TEXT =
+  'A free-text query to filter the page by relevance. When given, only the sections whose text ' +
+  'matches the query are returned, ranked by BM25 and fitted into max_length. Ignores start_index. ' +
+  'For the full page, omit this parameter.';
 
 export const pageToMarkdownInputSchema = z.object({
   url: z.string().url().optional().describe(URL_TEXT),
   html: z.string().max(10_000_000).optional().describe(HTML_TEXT),
+  query: z.string().max(1000).optional().describe(QUERY_TEXT),
   include_images: z.boolean().optional().default(true).describe(
     'Include image references (![alt](src)) in the output. Default: true.' + BRIDGE_SETTINGS_TEXT,
   ),
@@ -91,7 +97,8 @@ export const pageToMarkdownDefinition = {
     'itself, not a Markdown copy of it; a URL that names a Markdown or text file (a raw GitHub ' +
     'README.md, an llms.txt) comes back as written. ' +
     'A long page comes back in parts (`max_length`, `start_index`), the first part listing the page\'s ' +
-    'sections, and a page the server cannot read comes back with the next step to take. ' +
+    'sections; pass `query` to get only the sections relevant to a question (BM25 ranking, no API call). ' +
+    'A page the server cannot read comes back with the next step to take. ' +
     'Discovers tab groups statically and emits each panel as a `### Tab: {label}` section ' +
     'instead of concatenating (prevents Python+TypeScript examples merging into one broken block). ' +
     'Zero external API calls: pages are parsed locally (linkedom) or in the user\'s browser.',
@@ -107,6 +114,11 @@ export const pageToMarkdownDefinition = {
         type: 'string' as const,
         maxLength: 10_000_000,
         description: HTML_TEXT,
+      },
+      query: {
+        type: 'string' as const,
+        maxLength: 1000,
+        description: QUERY_TEXT,
       },
       include_images: {
         type: 'boolean' as const,
@@ -242,9 +254,10 @@ export const handlePageToMarkdown = async (
 
   const parts: Parts = {
     maxLength: input.max_length ?? serve.defaultMaxLength,
-    start: input.start_index,
+    start: input.query ? 0 : input.start_index,
     key: input.url === undefined ? null : JSON.stringify([input.url, input.include_images, input.include_frontmatter]),
     again: input.url === undefined ? 'html' : input.html === undefined ? 'url' : 'url+html',
+    query: input.query?.trim() || undefined,
   };
 
   // A later part of a long page comes from the text its first part was cut from (paging.ts).
@@ -409,6 +422,8 @@ interface Parts {
   key: string | null;
   /** What the next call must carry. */
   again: 'url' | 'url+html' | 'html';
+  /** BM25 query: when set, only matching sections are returned. */
+  query?: string;
 }
 
 const withNotes = (text: string, notes: string[]): PageToMarkdownResult => ({
@@ -418,6 +433,18 @@ const withNotes = (text: string, notes: string[]): PageToMarkdownResult => ({
 // One part of the page and its notes. A page that fits in one part comes back as before 0.7.0,
 // with no word about parts.
 const partOf = (text: string, notes: string[], parts: Parts): PageToMarkdownResult => {
+  // Query mode: return only sections matching the query, ranked by BM25.
+  if (parts.query && parts.maxLength !== undefined) {
+    const ranked = querySections(text, parts.query, parts.maxLength);
+    if (ranked) {
+      const body = ranked.sections.map((s) => s.text).join('\n\n');
+      return withNotes(body, [...notes, ranked.note]);
+    }
+    // No sections matched or no headings on the page: fall through to normal paging
+    // with a note, so the agent still gets the page content.
+    notes = [...notes, `No sections matched the query "${parts.query}". Returning the page without filtering.`];
+  }
+
   const { maxLength, start } = parts;
   if (start > 0 && start >= text.length) {
     return errorResult(`Invalid input: start_index: ${start} is past the end of the page, which has ${text.length} characters.`);
