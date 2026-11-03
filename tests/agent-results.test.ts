@@ -313,14 +313,16 @@ describe('page_to_markdown says what to do next', () => {
     expect(texts(r)[1]).toMatch(/^No readable text came out of this page: it is probably built by scripts/);
   });
 
-  it('reports a landing on a sign-in page, and not a page that names another base', async () => {
+  it('reports every redirect, with extra advice for a sign-in page', async () => {
     const landed = (baseUrl: string, title: string) =>
       ownFetch.mockImplementation(async () => ({ markdown: `# ${title}\n\nform\n`, title, baseUrl }));
     landed('https://github.com/login?return_to=%2Fsettings%2Fprofile', 'Sign in to GitHub · GitHub');
     const signin = texts(await handlePageToMarkdown({ url: 'https://github.com/settings/profile' }, LOCAL_SERVE));
     expect(signin[1]).toContain('redirected to https://github.com/login?return_to=%2Fsettings%2Fprofile, which looks like a sign-in page');
     landed('https://cdn.example.invalid/assets/', 'Docs page');
-    expect(texts(await handlePageToMarkdown({ url }, LOCAL_SERVE))).toHaveLength(1);
+    const moved = texts(await handlePageToMarkdown({ url }, LOCAL_SERVE));
+    expect(moved[1]).toContain('redirected to https://cdn.example.invalid/assets/');
+    expect(moved[1]).not.toContain('sign-in');
     landed('https://site.example.invalid/page/', 'Sign in');
     expect(texts(await handlePageToMarkdown({ url }, LOCAL_SERVE))).toHaveLength(1);
   });
