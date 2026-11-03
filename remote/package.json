@@ -5,7 +5,7 @@
   "description": "Hosted (Streamable HTTP) variant of the Page2AI MCP server, deployed on Vercel. Same tool implementation as the local stdio server.",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.18.1"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@page2ai/core": "^0.3.2",
-    "@page2ai/mcp": "^0.5.3",
+    "@page2ai/core": "^0.4.0",
+    "@page2ai/mcp": "^0.8.1",
     "mcp-handler": "^2.1.1",
     "zod": "^4.2.0"
   },
