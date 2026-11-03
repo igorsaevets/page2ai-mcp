@@ -16,7 +16,7 @@
     "node": ">=20.18.1"
   },
   "dependencies": {
-    "@page2ai/mcp": "^0.10.0"
+    "@page2ai/mcp": "^0.10.1"
   },
   "publishConfig": {
     "access": "public"
