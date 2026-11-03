@@ -9,7 +9,7 @@ vi.mock('@page2ai/core', async (importOriginal) => ({
   fetchAndConvert: ownFetch,
 }));
 import { FetchProtectionError, SsrfBlockedError } from '@page2ai/core';
-import { DEFAULT_MAX_LENGTH, cutAt, forgetKeptPages, sectionList, sectionsOf } from '../src/tools/paging.js';
+import { DEFAULT_MAX_LENGTH, cutAt, forgetKeptPages, sectionList, sectionsOf, tableHeaderAt } from '../src/tools/paging.js';
 import { LOCAL_SERVE, handlePageToMarkdown, setBridge } from '../src/tools/page-to-markdown.js';
 
 type Result = Awaited<ReturnType<typeof handlePageToMarkdown>>;
@@ -129,6 +129,38 @@ describe('the list of sections on the first part', () => {
   });
 });
 
+describe('tableHeaderAt', () => {
+  const table = '| Name | Value |\n| --- | --- |\n| a | 1 |\n| b | 2 |\n| c | 3 |\n';
+  const page = `# Title\n\nIntro text.\n\n${table}\nAfter.\n`;
+
+  it('returns the header when offset is on a data row', () => {
+    const dataStart = page.indexOf('| a | 1 |');
+    expect(tableHeaderAt(page, dataStart)).toBe('| Name | Value |\n| --- | --- |\n');
+    expect(tableHeaderAt(page, page.indexOf('| c | 3 |'))).toBe('| Name | Value |\n| --- | --- |\n');
+  });
+
+  it('returns null when offset is on the header or separator', () => {
+    expect(tableHeaderAt(page, page.indexOf('| Name'))).toBeNull();
+    expect(tableHeaderAt(page, page.indexOf('| --- |'))).toBeNull();
+  });
+
+  it('returns null when offset is not in a table', () => {
+    expect(tableHeaderAt(page, page.indexOf('Intro'))).toBeNull();
+    expect(tableHeaderAt(page, page.indexOf('After'))).toBeNull();
+  });
+
+  it('returns null at boundaries', () => {
+    expect(tableHeaderAt(page, 0)).toBeNull();
+    expect(tableHeaderAt(page, page.length)).toBeNull();
+  });
+
+  it('handles a table with alignment markers', () => {
+    const aligned = '| Left | Center | Right |\n| :--- | :---: | ---: |\n| x | y | z |\n';
+    const full = `text\n\n${aligned}`;
+    expect(tableHeaderAt(full, full.indexOf('| x |'))).toBe('| Left | Center | Right |\n| :--- | :---: | ---: |\n');
+  });
+});
+
 describe('page_to_markdown in parts (local server)', () => {
   const page = longMarkdown(150);
   const url = 'https://docs.example.invalid/long';
@@ -229,6 +261,30 @@ describe('page_to_markdown in parts (local server)', () => {
     const after = await handlePageToMarkdown({ url, start_index: more }, LOCAL_SERVE);
     expect(texts(after)[0]).toMatch(/## Row \d+/);
     expect(ownFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('table header in later parts', () => {
+  const url = 'https://docs.example.invalid/long';
+  const tableRows = Array.from({ length: 600 }, (_, i) => `| item-${i} | ${'description '.repeat(8)}|`);
+  const bigTable = `| Name | Description |\n| --- | --- |\n${tableRows.join('\n')}\n`;
+  const page = `# Catalog\n\nIntro.\n\n${bigTable}\n## After\n\nDone.\n`;
+
+  beforeEach(() => {
+    ownFetch.mockReset();
+    ownFetch.mockImplementation(async () => ({ markdown: page, title: 'Catalog', baseUrl: url }));
+  });
+  afterEach(() => forgetKeptPages());
+
+  it('prepends the table header to a part that starts inside a table', async () => {
+    const maxLen = 5000;
+    const first = await handlePageToMarkdown({ url, max_length: maxLen }, LOCAL_SERVE);
+    const note = texts(first)[1]!;
+    const next = Number(/start_index (\d+)/.exec(note)![1]);
+    expect(next).toBeGreaterThan(0);
+    const second = await handlePageToMarkdown({ url, start_index: next, max_length: maxLen }, LOCAL_SERVE);
+    const part2 = texts(second)[0]!;
+    expect(part2).toMatch(/^\| Name \| Description \|\n\| --- \| --- \|\n\| item-/);
   });
 });
 

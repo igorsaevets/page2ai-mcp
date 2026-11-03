@@ -26,6 +26,7 @@ import {
   keepPage,
   keptPage,
   sectionList,
+  tableHeaderAt,
 } from './paging.js';
 import { NO_BODY_MARKER, looksLikeSignin, nextStepForError } from './next-steps.js';
 
@@ -424,7 +425,9 @@ const partOf = (text: string, notes: string[], parts: Parts): PageToMarkdownResu
   const end = maxLength === undefined ? text.length : cutAt(text, start, maxLength);
   if (start === 0 && end === text.length) return withNotes(text, notes);
   if (parts.key && end < text.length) keepPage(parts.key, text);
-  return withNotes(text.slice(start, end), [...notes, partNote(text, start, end, parts.again)]);
+  const header = start > 0 ? tableHeaderAt(text, start) : null;
+  const part = header ? header + text.slice(start, end) : text.slice(start, end);
+  return withNotes(part, [...notes, partNote(text, start, end, parts.again)]);
 };
 
 const partNote = (text: string, start: number, end: number, again: Parts['again']): string => {

@@ -88,6 +88,35 @@ export const cutAt = (text: string, start: number, maxLength: number): number =>
   return code >= 0xd800 && code <= 0xdbff && limit - 1 > start ? limit - 1 : limit;
 };
 
+/**
+ * If `offset` lands inside a GFM table (a `|`-row block whose second line is
+ * a separator), return the header row + separator so a part that starts there
+ * is still a readable table. Returns null when not in a table, or when offset
+ * is on the header/separator itself (part 1 already has them).
+ */
+export const tableHeaderAt = (text: string, offset: number): string | null => {
+  if (offset <= 0 || offset >= text.length) return null;
+  const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+  const lineEnd = text.indexOf('\n', lineStart);
+  const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd);
+  if (!line.trimStart().startsWith('|')) return null;
+  let tableStart = lineStart;
+  while (tableStart > 0) {
+    const prevEnd = tableStart - 1;
+    const prevStart = text.lastIndexOf('\n', prevEnd - 1) + 1;
+    const prev = text.slice(prevStart, prevEnd);
+    if (!prev.trimStart().startsWith('|')) break;
+    tableStart = prevStart;
+  }
+  const hdrEnd = text.indexOf('\n', tableStart);
+  if (hdrEnd < 0) return null;
+  const sepEnd = text.indexOf('\n', hdrEnd + 1);
+  const sep = text.slice(hdrEnd + 1, sepEnd < 0 ? text.length : sepEnd);
+  if (!/^[|\s:-]+$/.test(sep.trim()) || !sep.includes('-') || !sep.includes('|')) return null;
+  if (offset < (sepEnd < 0 ? text.length : sepEnd + 1)) return null;
+  return text.slice(tableStart, hdrEnd) + '\n' + sep + '\n';
+};
+
 export interface Section {
   level: number;
   title: string;
