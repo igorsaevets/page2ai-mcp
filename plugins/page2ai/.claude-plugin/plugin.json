@@ -18,7 +18,7 @@
   "mcpServers": {
     "page2ai": {
       "command": "npx",
-      "args": ["-y", "page2ai-mcp@0.8.2"],
+      "args": ["-y", "page2ai-mcp@0.8.3"],
       "env": {
         "PAGE2AI_BRIDGE_KEY": "${user_config.bridge_key}"
       }

@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.8.3 - 2026-11-03
+
+### Changed
+
+- **`@page2ai/core` 0.4.1:** the `User-Agent` header now tracks the actual core version
+  (`page2ai-core/0.4.1`) instead of the stale `page2ai-core/0.1` it had since the first release.
+  Back-to-back fetches to the same hostname are now spaced at least 1 second apart (plus random
+  jitter), preventing a looping agent from hammering a single site.
+
 ## 0.8.2 - 2026-11-03
 
 ### Changed
