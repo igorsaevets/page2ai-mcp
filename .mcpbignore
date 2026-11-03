@@ -13,6 +13,7 @@ tsconfig*.json
 # Companion packages (not shipped in the stdio MCPB)
 remote/
 wrapper/
+cli/
 
 # The Claude Code plugin and its marketplace (installed from git, not from the bundle)
 .claude-plugin/
