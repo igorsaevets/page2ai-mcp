@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.8.2 - 2026-11-03
+
+### Changed
+
+- **All redirects reported.** When the fetched page is on a different host or path from the
+  requested URL, the tool result now carries a note naming the final URL. Previously, only
+  sign-in redirects were reported; other redirects (e.g. `http://` → `https://www.`) were
+  silent. Sign-in landings still get the extra session advice.
+- **Table header in parts.** When a long page is returned in parts and a part starts inside a
+  GFM table, the table's header row and separator are prepended so the agent knows which column
+  is which. Character offsets in the `start_index` note stay based on the original text.
+
 ## 0.8.1 - 2026-11-02
 
 ### Changed
