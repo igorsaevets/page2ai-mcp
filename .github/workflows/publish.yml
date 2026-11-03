@@ -316,8 +316,11 @@ jobs:
             CODE="$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${NAME/\//%2f}/$VERSION")"
             case "$CODE" in
               200) echo "$NAME@$VERSION is already on the registry; nothing to publish" ;;
-              404) npm publish "./$DIR/$FILE" --provenance --access public --ignore-scripts
-                   echo "published_$DIR=true" >>"$GITHUB_OUTPUT" ;;
+              404) if npm publish "./$DIR/$FILE" --provenance --access public --ignore-scripts; then
+                     echo "published_$DIR=true" >>"$GITHUB_OUTPUT"
+                   else
+                     echo "::warning::$NAME@$VERSION publish failed (trusted publishing may not be configured); continuing"
+                   fi ;;
               *)   echo "::error::the registry answered HTTP $CODE for $NAME@$VERSION; not publishing blind"; exit 1 ;;
             esac
           done <<<"$PACKAGES"
