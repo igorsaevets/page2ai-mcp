@@ -73,6 +73,9 @@ jobs:
       wrapper_name: ${{ steps.pack.outputs.wrapper_name }}
       wrapper_file: ${{ steps.pack.outputs.wrapper_file }}
       wrapper_integrity: ${{ steps.pack.outputs.wrapper_integrity }}
+      cli_name: ${{ steps.pack.outputs.cli_name }}
+      cli_file: ${{ steps.pack.outputs.cli_file }}
+      cli_integrity: ${{ steps.pack.outputs.cli_integrity }}
 
     steps:
       - name: Publish only from a v* tag
@@ -163,6 +166,21 @@ jobs:
       # The Claude Code plugin starts the server through npx pinned to one release
       # (Anthropic's plugin directory refuses an unpinned launcher), so a release
       # that leaves the pin behind keeps every plugin user on the previous server.
+      - name: Check the CLI version
+        run: |
+          WANT="$(node -p "require('./cli/package.json').version")"
+          MAIN="$(node -p "require('./package.json').version")"
+          if [ "$WANT" != "$MAIN" ]; then
+            echo "::error::cli/package.json is $WANT but package.json is $MAIN; they must match"
+            exit 1
+          fi
+          DEP="$(node -p "require('./cli/package.json').dependencies['@page2ai/core']")"
+          CORE="$(node -p "require('./package.json').dependencies['@page2ai/core']")"
+          if [ "$DEP" != "$CORE" ]; then
+            echo "::error::cli depends on @page2ai/core '$DEP'; expected '$CORE' (same as the MCP server)"
+            exit 1
+          fi
+
       - name: Check the Claude Code plugin's pinned server
         run: |
           PIN="$(node -p "require('./plugins/page2ai/.claude-plugin/plugin.json').mcpServers.page2ai.args.join(' ')")"
@@ -172,25 +190,27 @@ jobs:
             exit 1
           fi
 
-      - name: Pack both packages
+      - name: Pack all three packages
         id: pack
-        # npm pack runs no script of either package (neither has prepack,
+        # npm pack runs no script of any package (none has prepack,
         # prepare or postpack), so the tarballs hold exactly what was built and
-        # tested above. Both are named page2ai-mcp-<version>.tgz (the scope is
-        # dropped from the file name), hence one folder each.
+        # tested above. Each gets its own folder to avoid name collisions.
         run: |
-          mkdir -p "$RUNNER_TEMP/pack/scoped" "$RUNNER_TEMP/pack/wrapper"
+          mkdir -p "$RUNNER_TEMP/pack/scoped" "$RUNNER_TEMP/pack/wrapper" "$RUNNER_TEMP/pack/cli"
           npm pack --json --pack-destination "$RUNNER_TEMP/pack/scoped" >"$RUNNER_TEMP/scoped.json"
           (cd wrapper && npm pack --json --pack-destination "$RUNNER_TEMP/pack/wrapper") >"$RUNNER_TEMP/wrapper.json"
+          (cd cli && npm pack --json --pack-destination "$RUNNER_TEMP/pack/cli") >"$RUNNER_TEMP/cli.json"
           node -e '
             const fs = require("fs");
             const [s] = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             const [w] = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-            if (s.version !== w.version) throw new Error(`packed ${s.version} and ${w.version}`);
+            const [c] = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+            if (s.version !== w.version || s.version !== c.version) throw new Error(`packed ${s.version}, ${w.version}, ${c.version}`);
             console.log([`version=${s.version}`,
               `scoped_name=${s.name}`, `scoped_file=${s.filename}`, `scoped_integrity=${s.integrity}`,
-              `wrapper_name=${w.name}`, `wrapper_file=${w.filename}`, `wrapper_integrity=${w.integrity}`].join("\n"));
-          ' "$RUNNER_TEMP/scoped.json" "$RUNNER_TEMP/wrapper.json" | tee -a "$GITHUB_OUTPUT"
+              `wrapper_name=${w.name}`, `wrapper_file=${w.filename}`, `wrapper_integrity=${w.integrity}`,
+              `cli_name=${c.name}`, `cli_file=${c.filename}`, `cli_integrity=${c.integrity}`].join("\n"));
+          ' "$RUNNER_TEMP/scoped.json" "$RUNNER_TEMP/wrapper.json" "$RUNNER_TEMP/cli.json" | tee -a "$GITHUB_OUTPUT"
 
       - name: Hand the tarballs to the publish job
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -217,6 +237,7 @@ jobs:
     outputs:
       published_scoped: ${{ steps.publish.outputs.published_scoped }}
       published_wrapper: ${{ steps.publish.outputs.published_wrapper }}
+      published_cli: ${{ steps.publish.outputs.published_cli }}
 
     # One line per package, scoped first: the wrapper depends on it.
     env:
@@ -224,6 +245,7 @@ jobs:
       PACKAGES: |
         scoped ${{ needs.build.outputs.scoped_name }} ${{ needs.build.outputs.scoped_file }} ${{ needs.build.outputs.scoped_integrity }}
         wrapper ${{ needs.build.outputs.wrapper_name }} ${{ needs.build.outputs.wrapper_file }} ${{ needs.build.outputs.wrapper_integrity }}
+        cli ${{ needs.build.outputs.cli_name }} ${{ needs.build.outputs.cli_file }} ${{ needs.build.outputs.cli_integrity }}
 
     steps:
       - name: Setup Node.js 24 LTS
@@ -263,7 +285,7 @@ jobs:
           while read -r DIR NAME FILE INTEGRITY; do
             [ -n "$DIR" ] || continue
             case "$DIR:$NAME" in
-              scoped:@page2ai/mcp | wrapper:page2ai-mcp) ;;
+              scoped:@page2ai/mcp | wrapper:page2ai-mcp | cli:page2ai) ;;
               *) fail "the build job packed '$NAME' as '$DIR'" ;;
             esac
             [[ "$FILE" =~ ^[A-Za-z0-9._-]+\.tgz$ ]] && [ -f "$DIR/$FILE" ] || fail "no tarball '$DIR/$FILE' was handed over"
@@ -338,6 +360,7 @@ jobs:
       PACKAGES: |
         ${{ needs.build.outputs.scoped_name }} ${{ needs.build.outputs.scoped_integrity }} ${{ needs.publish.outputs.published_scoped }}
         ${{ needs.build.outputs.wrapper_name }} ${{ needs.build.outputs.wrapper_integrity }} ${{ needs.publish.outputs.published_wrapper }}
+        ${{ needs.build.outputs.cli_name }} ${{ needs.build.outputs.cli_integrity }} ${{ needs.publish.outputs.published_cli }}
 
     steps:
       - name: Setup Node.js 24 LTS
@@ -411,7 +434,7 @@ jobs:
           TRIES=60
           if [ "$PROBE" = true ]; then TRIES=3; fi
           for i in $(seq 1 "$TRIES"); do
-            if npm install --ignore-scripts --no-audit --no-fund "page2ai-mcp@$VERSION" "@page2ai/mcp@$VERSION" >/dev/null 2>"$RUNNER_TEMP/install.err"; then break; fi
+            if npm install --ignore-scripts --no-audit --no-fund "page2ai-mcp@$VERSION" "@page2ai/mcp@$VERSION" "page2ai@$VERSION" >/dev/null 2>"$RUNNER_TEMP/install.err"; then break; fi
             if [ "$i" -eq "$TRIES" ]; then
               cat "$RUNNER_TEMP/install.err"
               echo "::error::npm cannot install page2ai-mcp@$VERSION and @page2ai/mcp@$VERSION"
@@ -425,7 +448,7 @@ jobs:
             exit 1
           fi
           FAIL=0
-          for NAME in @page2ai/mcp page2ai-mcp; do
+          for NAME in @page2ai/mcp page2ai-mcp page2ai; do
             if jq -e --arg n "$NAME" --arg v "$VERSION" 'any((.verified // [])[]; .name == $n and .version == $v)' "$RUNNER_TEMP/audit.json" >/dev/null; then
               echo "$NAME@$VERSION: registry signature and provenance attestation verified by npm audit signatures"
             else
