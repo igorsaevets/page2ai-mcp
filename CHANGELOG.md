@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the
 major version is `0`, a minor bump may carry breaking changes.
 
+## 0.8.1 - 2026-11-02
+
+### Changed
+
+- **`@page2ai/core` 0.4.0:** `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` environment variables are now
+  honoured by the page fetch. Corporate networks and self-hosted CI runners behind a proxy can set
+  these variables and `page_to_markdown` will route through the proxy while keeping SSRF checks.
+  undici upgraded to 7.30.1 (fixes CVE-2026-87018). Node.js >=20.18.1 required.
+
 ## 0.8.0 - 2026-11-02
 
 Multiple MCP clients (Claude Desktop, Cursor, `claude -p`) can now share the user's browser through Agent Bridge simultaneously.
