@@ -168,8 +168,10 @@ if (SLOW) {
 // 5b. --slow-container=<url>: the container has no 30 s stop and no clamp. A page that answers
 //     after 40-55 s must come back as a whole JSON-RPC result (the page, or an error from the tool
 //     itself), never a stream cut by a proxy in front (Cloudflare reads for 125 s). Give the URL of
-//     such a page: public delay services stopped holding a response that long (httpbin.org answers
-//     400 above 10 s since 2026-11), so a slow page of your own behind a temporary tunnel is the source.
+//     such a page: httpbin.org answers 400 above 10 s since 2026-11, while https://httpbin.dev/delay/50
+//     and https://httpbun.com/delay/50 held 50 s on 2026-11-09 (JSON, so the result is the tool's own
+//     content-type error, which still proves the stream was not cut); a slow HTML page of your own
+//     behind a temporary tunnel also proves the content arrives whole.
 if (SLOW_CONTAINER) {
   const slowUrl = cliArgs.find((a) => a.startsWith('--slow-container='))?.slice('--slow-container='.length);
   if (!slowUrl) {
