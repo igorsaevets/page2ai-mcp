@@ -24,21 +24,23 @@
   <p class="note">
     Requests to this hosted endpoint transit this server: the URL you ask it to
     convert is fetched from here. No accounts, no advertising or cross-site
-    tracking; operational logs are Vercel platform defaults. Full policy:
+    tracking; the server and its proxy (Cloudflare) keep short-lived logs
+    (the application logs the hostname asked for, never the full URL). Full policy:
     <a href="/privacy.html">Privacy Policy</a>. If you want zero egress to any
     third party, run the same server locally instead —
     <code>npx -y page2ai-mcp</code> — it is the same code and stays entirely on
     your machine.
   </p>
   <p>
-    Rate limits apply (per-IP, in code and at the platform firewall). The
+    Rate limits apply (per client, and on conversions running at once). The
     fetcher blocks private network ranges, loopback and cloud metadata
-    endpoints, caps responses at 10&nbsp;MB and enforces timeouts.
+    endpoints, fetches only ports 80 and 443, caps responses at 10&nbsp;MB and
+    enforces timeouts.
   </p>
   <p>
     <strong>Acceptable use:</strong> this endpoint exists for converting pages
     you may lawfully read into Markdown for AI context. Bulk scraping, relay
-    abuse and unlawful use are prohibited and get blocked. Security reports:
+    abuse and unlawful use are prohibited and get blocked. Abuse reports (for example, a site owner who sees unwanted requests from this service): <a href="mailto:support@igorsaevets.com">support@igorsaevets.com</a>, with the time and the site's hostname; requests from this service carry the user agent <code>page2ai-core/&lt;version&gt;</code> with a link to its source. Security reports:
     <a href="https://github.com/igorsaevets/page2ai-mcp/security">GitHub private
     vulnerability reporting</a>.
   </p>

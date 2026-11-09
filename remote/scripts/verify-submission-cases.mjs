@@ -89,7 +89,7 @@ const cases = [
     desc: 'file:// scheme -> refused by scheme validation (isError)',
     run: async () => {
       const r = await call({ url: 'file:///etc/passwd' });
-      return r.isError === true && /scheme|file:|not in/i.test(text(r));
+      return r.isError === true && /scheme|file:|not in|only http/i.test(text(r));
     },
   },
   {

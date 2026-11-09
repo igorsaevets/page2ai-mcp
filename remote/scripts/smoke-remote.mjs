@@ -3,13 +3,14 @@
 // Speaks raw JSON-RPC over fetch — no SDK dependency — so it verifies the wire
 // format an arbitrary client sees, not what our own libraries would negotiate.
 //
-// Usage: node scripts/smoke-remote.mjs [endpointUrl] [--slow]
+// Usage: node scripts/smoke-remote.mjs [endpointUrl] [--slow | --slow-container]
 //   default endpoint: http://localhost:3999/api/mcp
 //   --slow: also check the hosted timeout clamp (about 20 s more, uses httpbin.org)
 import assert from 'node:assert';
 
 const cliArgs = process.argv.slice(2);
 const SLOW = cliArgs.includes('--slow');
+const SLOW_CONTAINER = cliArgs.includes('--slow-container');
 const ENDPOINT = cliArgs.find((a) => !a.startsWith('--')) ?? 'http://localhost:3999/api/mcp';
 const CLIENT_PROTOCOL = '2026-07-28';
 
@@ -101,18 +102,20 @@ assert.ok(names.includes('page_to_markdown'), `tools/list missing page_to_markdo
 console.log(`tools/list ok: ${names.join(', ')}`);
 
 // 3b. the ChatGPT plugin runs whatever this endpoint lists: it must stay the reviewed
-// contract (description sha256 783d1e41f68e, 898 chars; url + three options).
+// contract plus `query` (mcp 0.10.1, 2026-11-03: description sha256 2b2d5ad05e9e, 996 chars;
+// url, query and three options; was 783d1e41f68e / 898 without query).
 const ptm = tools.tools.find((t) => t.name === 'page_to_markdown');
 const { createHash } = await import('node:crypto');
 const descSha = createHash('sha256').update(ptm.description, 'utf8').digest('hex').slice(0, 12);
-assert.deepStrictEqual([descSha, ptm.description.length], ['783d1e41f68e', 898], 'description differs from the reviewed copy');
+assert.deepStrictEqual([descSha, ptm.description.length], ['2b2d5ad05e9e', 996], 'description differs from the reviewed copy');
 assert.deepStrictEqual(Object.keys(ptm.inputSchema.properties ?? {}),
-  ['url', 'include_images', 'include_frontmatter', 'timeout_ms'], 'input properties differ from the reviewed contract');
+  ['url', 'query', 'include_images', 'include_frontmatter', 'timeout_ms'], 'input properties differ from the reviewed contract');
 assert.deepStrictEqual(ptm.inputSchema.required, ['url'], 'url must stay required');
 // The whole emitted schema too: a zod or SDK update in this lock can change it ($schema,
-// formats, defaults) with the keys intact. Pinned from production on 2026-10-23 (T170).
+// formats, defaults) with the keys intact. Pinned from production on 2026-11-09 (mcp 0.10.1 + query;
+// 72f90bf32a4d from 2026-10-23 before it).
 const schemaSha = createHash('sha256').update(JSON.stringify(ptm.inputSchema), 'utf8').digest('hex').slice(0, 12);
-assert.strictEqual(schemaSha, '72f90bf32a4d', 'inputSchema JSON differs from the copy pinned on 2026-10-23');
+assert.strictEqual(schemaSha, 'c8edc8eb6b04', 'inputSchema JSON differs from the copy pinned on 2026-11-09');
 assert.strictEqual(ptm.title, 'Convert Page to Markdown', 'title differs');
 assert.deepStrictEqual(ptm.annotations,
   { readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false }, 'annotations differ');
@@ -160,6 +163,26 @@ if (SLOW) {
   );
   assert.ok(slowSecs < 28, `slow call took ${slowSecs.toFixed(1)}s, too close to the 30 s stop`);
   console.log(`tools/call --slow ok: clamped timeout answered in ${slowSecs.toFixed(1)}s`);
+}
+
+// 5b. --slow-container: the container has no 30 s stop and no clamp. The same page (headers after
+//     40 s) must come back as a whole JSON-RPC result, an error from the tool itself (its content
+//     type is refused), never a stream cut by a proxy in front (Cloudflare reads for 125 s).
+if (SLOW_CONTAINER) {
+  const slowStart = Date.now();
+  const slow = await rpc('tools/call', {
+    name: 'page_to_markdown',
+    arguments: {
+      url: 'https://httpbin.org/drip?delay=40&duration=0&numbytes=1&code=200',
+      timeout_ms: 60000,
+    },
+  });
+  const slowText = slow.content?.find((c) => c.type === 'text')?.text ?? '';
+  const slowSecs = (Date.now() - slowStart) / 1000;
+  assert.ok(slow.isError, `slow call: expected the tool's own error, got ${slowText.slice(0, 200)}`);
+  assert.ok(!slowText.includes('caps timeout_ms'), `slow call was clamped: ${slowText.slice(0, 300)}`);
+  assert.ok(slowSecs > 35, `slow call answered in ${slowSecs.toFixed(1)}s: the page was not waited for`);
+  console.log(`tools/call --slow-container ok: unclamped, answered in ${slowSecs.toFixed(1)}s: ${slowText.slice(0, 90)}`);
 }
 
 console.log(`SMOKE PASS in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
