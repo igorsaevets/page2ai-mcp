@@ -188,3 +188,26 @@ Script (recorded in ChatGPT on Igor's account — his hands; ~2 minutes):
 6. **Igor, by hand:** read the policy attestations, click **Submit**.
 7. **Me:** record submission date + any receipt in `.memory/STATE.md`;
    silence-clock per directory norms before any follow-up.
+
+## 9. Host move (2026-11-09): the approved plugin's MCP URL
+
+The hosted endpoint moved to a container behind Cloudflare: **`https://page2ai.igorsaevets.com/api/mcp`**.
+It serves the same tool contract as the Vercel deployment (description and input schema pinned by
+`scripts/smoke-remote.mjs`), and the same domain-verification token at `/.well-known/openai-apps-challenge`
+(both hosts are built from `public/.well-known/openai-apps-challenge`).
+
+OpenAI's submission page, read 2026-11-09 (`developers.openai.com/apps-sdk/deploy/submission`):
+*"To change an existing MCP server's URL, contact support; the current update flow does not support URL
+changes."* Domain verification: *"The challenge base must be an HTTPS origin on the MCP hostname or an
+eligible parent domain; paths are ignored."*
+
+So the approved plugin keeps calling `https://page2ai-mcp-remote.vercel.app/api/mcp`, which stays up, until
+OpenAI support changes the URL. The listing fields that point at the old host have equivalents on the new one:
+
+| Field | New value |
+|---|---|
+| MCP Server URL | `https://page2ai.igorsaevets.com/api/mcp` |
+| Website URL | `https://page2ai.igorsaevets.com/` |
+| Support URL | `https://page2ai.igorsaevets.com/support.html` |
+| Privacy policy URL | `https://page2ai.igorsaevets.com/privacy.html` |
+| Terms URL | `https://page2ai.igorsaevets.com/terms.html` |
