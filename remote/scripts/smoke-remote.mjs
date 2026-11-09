@@ -3,14 +3,14 @@
 // Speaks raw JSON-RPC over fetch — no SDK dependency — so it verifies the wire
 // format an arbitrary client sees, not what our own libraries would negotiate.
 //
-// Usage: node scripts/smoke-remote.mjs [endpointUrl] [--slow | --slow-container]
+// Usage: node scripts/smoke-remote.mjs [endpointUrl] [--slow | --slow-container=<url of a page answering after 40-55 s>]
 //   default endpoint: http://localhost:3999/api/mcp
 //   --slow: also check the hosted timeout clamp (about 20 s more, uses httpbin.org)
 import assert from 'node:assert';
 
 const cliArgs = process.argv.slice(2);
 const SLOW = cliArgs.includes('--slow');
-const SLOW_CONTAINER = cliArgs.includes('--slow-container');
+const SLOW_CONTAINER = cliArgs.some((a) => a === '--slow-container' || a.startsWith('--slow-container='));
 const ENDPOINT = cliArgs.find((a) => !a.startsWith('--')) ?? 'http://localhost:3999/api/mcp';
 const CLIENT_PROTOCOL = '2026-07-28';
 
@@ -165,24 +165,27 @@ if (SLOW) {
   console.log(`tools/call --slow ok: clamped timeout answered in ${slowSecs.toFixed(1)}s`);
 }
 
-// 5b. --slow-container: the container has no 30 s stop and no clamp. The same page (headers after
-//     40 s) must come back as a whole JSON-RPC result, an error from the tool itself (its content
-//     type is refused), never a stream cut by a proxy in front (Cloudflare reads for 125 s).
+// 5b. --slow-container=<url>: the container has no 30 s stop and no clamp. A page that answers
+//     after 40-55 s must come back as a whole JSON-RPC result (the page, or an error from the tool
+//     itself), never a stream cut by a proxy in front (Cloudflare reads for 125 s). Give the URL of
+//     such a page: public delay services stopped holding a response that long (httpbin.org answers
+//     400 above 10 s since 2026-11), so a slow page of your own behind a temporary tunnel is the source.
 if (SLOW_CONTAINER) {
-  const slowStart = Date.now();
-  const slow = await rpc('tools/call', {
-    name: 'page_to_markdown',
-    arguments: {
-      url: 'https://httpbin.org/drip?delay=40&duration=0&numbytes=1&code=200',
-      timeout_ms: 60000,
-    },
-  });
-  const slowText = slow.content?.find((c) => c.type === 'text')?.text ?? '';
-  const slowSecs = (Date.now() - slowStart) / 1000;
-  assert.ok(slow.isError, `slow call: expected the tool's own error, got ${slowText.slice(0, 200)}`);
-  assert.ok(!slowText.includes('caps timeout_ms'), `slow call was clamped: ${slowText.slice(0, 300)}`);
-  assert.ok(slowSecs > 35, `slow call answered in ${slowSecs.toFixed(1)}s: the page was not waited for`);
-  console.log(`tools/call --slow-container ok: unclamped, answered in ${slowSecs.toFixed(1)}s: ${slowText.slice(0, 90)}`);
+  const slowUrl = cliArgs.find((a) => a.startsWith('--slow-container='))?.slice('--slow-container='.length);
+  if (!slowUrl) {
+    console.log('tools/call --slow-container skipped: pass --slow-container=<url of a page that answers after 40-55 s>');
+  } else {
+    const slowStart = Date.now();
+    const slow = await rpc('tools/call', {
+      name: 'page_to_markdown',
+      arguments: { url: slowUrl, timeout_ms: 60000 },
+    });
+    const slowText = slow.content?.find((c) => c.type === 'text')?.text ?? '';
+    const slowSecs = (Date.now() - slowStart) / 1000;
+    assert.ok(!slowText.includes('caps timeout_ms'), `slow call was clamped: ${slowText.slice(0, 300)}`);
+    assert.ok(slowSecs > 35, `slow call answered in ${slowSecs.toFixed(1)}s: the page was not waited for`);
+    console.log(`tools/call --slow-container ok: unclamped, whole result after ${slowSecs.toFixed(1)}s (isError=${slow.isError === true}): ${slowText.slice(0, 90)}`);
+  }
 }
 
 console.log(`SMOKE PASS in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

@@ -41,12 +41,15 @@ patch releases only.
 For clients that only accept a remote MCP server URL (Streamable HTTP):
 
 ```
-https://page2ai-mcp-remote.vercel.app/api/mcp
+https://page2ai.igorsaevets.com/api/mcp
 ```
 
-Same tool, same code (see [`remote/`](./remote)), rate-limited per IP.
+Same tool, same code (see [`remote/`](./remote)), rate-limited per IP. The earlier
+address, `https://page2ai-mcp-remote.vercel.app/api/mcp`, keeps answering while clients
+move to the new one.
 **Privacy trade-off:** URLs sent to the hosted endpoint are fetched *from that
-server*, so they transit infrastructure operated by the author (on Vercel).
+server*, so they transit infrastructure operated by the author (a server in New York
+behind Cloudflare; the earlier address runs on Vercel).
 Running locally via `npx` keeps everything on your machine — prefer it when you
 can.
 
@@ -339,8 +342,9 @@ renders it, signed-in content included, over a WebSocket on 127.0.0.1; nothing e
 the machine, but the Markdown then goes to your AI client like any other result.
 
 The optional **hosted endpoint** is different by nature: URLs you ask it to convert are
-fetched from a server operated by the author (deployed on Vercel), and Vercel keeps its
-standard operational logs. No accounts, no tracking. If that trade-off matters for your
+fetched from a server operated by the author (a server in New York behind Cloudflare; the
+earlier address runs on Vercel), and those providers keep their standard operational logs
+(details: [privacy policy](https://page2ai.igorsaevets.com/privacy.html)). No accounts, no tracking. If that trade-off matters for your
 use case, run the server locally — it is the same code.
 
 ## Protocol revisions

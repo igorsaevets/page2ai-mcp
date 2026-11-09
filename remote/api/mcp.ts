@@ -119,13 +119,13 @@ async function handleHosted(args: unknown) {
 // evaluated at the wider inferred type, and the cast then narrows to the declared shape.
 const serverInfoWithMetadata = {
   name: 'page2ai-mcp-remote',
-  version: '0.1.3',
+  version: '0.2.0',
   title: 'Page2AI (hosted)',
   description:
     'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
     'context. Preserves code blocks with language hints, tables, and reading structure. ' +
     'Zero telemetry, MIT-licensed. Hosted variant of @page2ai/mcp.',
-  websiteUrl: 'https://page2ai-mcp-remote.vercel.app',
+  websiteUrl: 'https://page2ai.igorsaevets.com',
 };
 
 const mcp = createMcpHandler(

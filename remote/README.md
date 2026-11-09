@@ -50,11 +50,14 @@ npm install
 npm run typecheck
 npx tsx scripts/local-serve.mts &   # terminal 1
 node scripts/smoke-remote.mjs       # terminal 2, defaults to localhost
-node scripts/smoke-remote.mjs https://page2ai-mcp-remote.vercel.app/api/mcp
+node scripts/smoke-remote.mjs https://page2ai.igorsaevets.com/api/mcp
 ```
 
-Production endpoint: **https://page2ai-mcp-remote.vercel.app/api/mcp**
-(deployed 2026-08-30; both era smokes pass in under 1 s each).
+Production endpoint: **https://page2ai.igorsaevets.com/api/mcp** (the container,
+since 2026-11-09). The Vercel deployment, **https://page2ai-mcp-remote.vercel.app/api/mcp**
+(since 2026-08-30), keeps answering while clients move: the ChatGPT plugin approved on
+that origin cannot change its host, so it stays there until a plugin on the new host is
+approved.
 
 ## Container
 
