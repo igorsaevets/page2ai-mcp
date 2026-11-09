@@ -1,0 +1,9 @@
+node_modules
+.vercel
+.env*
+*.zip
+*.log
+scripts
+tests
+Dockerfile
+.dockerignore

@@ -15,7 +15,7 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
+  <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai.igorsaevets.com</code>; until the move is complete also <code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
 
   <h2>Who operates this</h2>
   <p>
@@ -65,26 +65,43 @@
     cookies. Retention by the application is zero.
   </p>
 
-  <h2>Infrastructure logs (subprocessor)</h2>
+  <h2>Infrastructure and logs (subprocessors)</h2>
   <p>
-    Hosting is provided by <strong>Vercel Inc.</strong> (USA). Vercel keeps its
-    standard operational logs — which include the caller's IP address, user agent,
-    request path and timing — under
-    <a href="https://vercel.com/legal/privacy-notice">Vercel's privacy notice</a>.
-    We set no retention of our own on those logs and do not control Vercel's
-    schedule; the application itself retains nothing. We do not enrich, export,
-    <strong>sell or share</strong> these logs or any personal information; we read
-    logs only for abuse handling and debugging. Because hosting is in the United
-    States, requests from the EU/EEA are transferred to the US under the
-    safeguards described in Vercel's notice.
+    <strong><code>page2ai.igorsaevets.com</code></strong>: requests pass through
+    <strong>Cloudflare, Inc.</strong> (USA), which proxies the hostname and handles
+    TLS, under <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's
+    privacy policy</a>, and reach a virtual server we rent from
+    <a href="https://datawagon.com/">DataWagon</a> in New York (USA). Cloudflare and
+    the server's reverse proxies see each request's client IP address, user agent,
+    request line and timing, and the server's edge proxy keeps an access log of
+    them. The application logs one line per request: the time, the status, how
+    long it took, the <strong>hostname</strong> of the page asked for (never the
+    full URL, never the page content) and a pseudonymous tag of the client that
+    is derived with a key held only in memory and changes on every restart; it
+    logs no IP address. Server logs are rotated by size (at most about 100&nbsp;MB
+    per service) and overwritten as new requests arrive; no other copy is kept.
+  </p>
+  <p>
+    <strong><code>page2ai-mcp-remote.vercel.app</code></strong> (the earlier
+    address, kept running until clients have moved): hosting by
+    <strong>Vercel Inc.</strong> (USA), which keeps its standard operational logs
+    (caller's IP address, user agent, request path, timing) under
+    <a href="https://vercel.com/legal/privacy-notice">Vercel's privacy notice</a>,
+    on Vercel's schedule.
+  </p>
+  <p>
+    We do not enrich, export, <strong>sell or share</strong> these logs or any
+    personal information; we read logs only for abuse handling and debugging.
+    Because hosting is in the United States, requests from the EU/EEA are
+    transferred to the US.
   </p>
 
   <h2>Your rights</h2>
   <p>
-    The application stores no personal data, so there is nothing for us to
-    access, correct, export or delete on request — the answer to any such
-    request is genuinely "we hold nothing." For Vercel's operational logs,
-    Vercel's own privacy process applies. If you believe this service has
+    The application stores no personal data. The server's access logs hold
+    IP addresses only until they rotate out; on request (contact below) we
+    delete the lines we can match to you. For Cloudflare's and Vercel's own
+    records, their privacy processes apply. If you believe this service has
     mishandled your data, contact us (above); EU/EEA users may also lodge a
     complaint with their supervisory authority, and California residents have
     the rights listed in the CCPA — including that we do not sell or share
@@ -107,7 +124,8 @@
 
   <h2>Contact</h2>
   <p>
-    Questions: <a href="https://github.com/igorsaevets/page2ai-mcp/issues">GitHub issues</a>.
+    Questions: <a href="https://github.com/igorsaevets/page2ai-mcp/issues">GitHub issues</a>
+    or <a href="mailto:support@igorsaevets.com">support@igorsaevets.com</a>.
     Security reports: <a href="https://github.com/igorsaevets/page2ai-mcp/security">GitHub
     private vulnerability reporting</a>.
   </p>

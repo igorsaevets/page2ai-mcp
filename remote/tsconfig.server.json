@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  },
+  "include": ["server.mts", "lib/**/*.mts", "tests/**/*.mts", "api/**/*.ts"]
+}

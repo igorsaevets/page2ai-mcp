@@ -1,4 +1,5 @@
-// Hosted (Streamable HTTP) variant of the Page2AI MCP server, for Vercel.
+// Hosted (Streamable HTTP) variant of the Page2AI MCP server: the Vercel function, and the handler
+// the Node server (server.mts, the container) wraps with its own limits.
 // Reuses the exact tool implementation shipped in @page2ai/mcp, so the hosted
 // endpoint inherits the same SSRF guard, 10MB size cap, timeout enforcement
 // and error mapping as the local stdio server — one source of truth.
@@ -53,7 +54,11 @@ function limited(ip: string): boolean {
 // reason (P2A-023, reproduced 2026-10-19). Clamped, the fetch aborts first and the tool
 // answers with its own error. 20 s leaves 10 s for start-up and conversion: a 7.6 MB page
 // (tc39.es/ecma262) took 6.7 s end to end on this endpoint, and the size cap is 10 MB.
-const HOSTED_MAX_TIMEOUT_MS = 20_000;
+// The container (server.mts) has no such stop; its ceiling is Cloudflare's proxy read timeout (125 s),
+// so it sets PAGE2AI_MAX_TIMEOUT_MS=60000, the schema's own maximum, and no request is clamped there.
+const TIMEOUT_OVERRIDE = Number(process.env.PAGE2AI_MAX_TIMEOUT_MS);
+const HOSTED_MAX_TIMEOUT_MS = Number.isInteger(TIMEOUT_OVERRIDE) && TIMEOUT_OVERRIDE >= 1000 ? TIMEOUT_OVERRIDE : 20_000;
+const CLAMP_REASON = HOSTED_MAX_TIMEOUT_MS === TIMEOUT_OVERRIDE ? '' : ' because its platform stops every request at 30 s';
 
 const HTML_REFUSAL =
   'Invalid input: html: this hosted endpoint takes `url` only. The local server (npx -y page2ai-mcp) converts HTML you pass.';
@@ -100,8 +105,7 @@ async function handleHosted(args: unknown) {
   if (result.isError && first?.type === 'text' && first.text.startsWith('Fetch timed out after')) {
     const note =
       ` This hosted endpoint caps timeout_ms at ${HOSTED_MAX_TIMEOUT_MS} (${requested} was requested)` +
-      ' because its platform stops every request at 30 s; the local server' +
-      ' (npx -y page2ai-mcp) accepts up to 60000.';
+      `${CLAMP_REASON}; the local server (npx -y page2ai-mcp) accepts up to 60000.`;
     return { ...result, content: [{ ...first, text: first.text + note }, ...result.content.slice(1)] };
   }
   return result;
@@ -115,13 +119,13 @@ async function handleHosted(args: unknown) {
 // evaluated at the wider inferred type, and the cast then narrows to the declared shape.
 const serverInfoWithMetadata = {
   name: 'page2ai-mcp-remote',
-  version: '0.1.3',
+  version: '0.2.0',
   title: 'Page2AI (hosted)',
   description:
     'Convert any webpage URL to clean Markdown for ChatGPT, Claude, and Gemini ' +
     'context. Preserves code blocks with language hints, tables, and reading structure. ' +
     'Zero telemetry, MIT-licensed. Hosted variant of @page2ai/mcp.',
-  websiteUrl: 'https://page2ai-mcp-remote.vercel.app',
+  websiteUrl: 'https://page2ai.igorsaevets.com',
 };
 
 const mcp = createMcpHandler(
@@ -144,7 +148,7 @@ const mcp = createMcpHandler(
   },
 );
 
-const CORS_HEADERS = {
+export const CORS_HEADERS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
   'access-control-allow-headers': 'content-type, accept, mcp-session-id, mcp-protocol-version, authorization',
@@ -153,7 +157,7 @@ const CORS_HEADERS = {
   'cache-control': 'no-store',
 };
 
-function handleOptions(): Response {
+export function handleOptions(): Response {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
@@ -170,17 +174,36 @@ function originAllowed(origin: string | null): boolean {
   }
 }
 
+// Origin check, the html refusal, the MCP handler and CORS: everything but the rate limit, which
+// each host applies its own way (withLimit below on Vercel, lib/limits.mts in the container).
+function forbiddenOrigin(): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32003, message: 'Forbidden origin.' },
+      id: null,
+    }),
+    { status: 403, headers: { 'content-type': 'application/json', ...CORS_HEADERS } },
+  );
+}
+
+export async function handleMcp(req: Request): Promise<Response> {
+  if (!originAllowed(req.headers.get('origin'))) return forbiddenOrigin();
+  const refusal = await refuseHtml(req);
+  if (refusal) return refusal;
+  const response = await mcp(req);
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function withLimit(req: Request): Promise<Response> {
-  if (!originAllowed(req.headers.get('origin'))) {
-    return new Response(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        error: { code: -32003, message: 'Forbidden origin.' },
-        id: null,
-      }),
-      { status: 403, headers: { 'content-type': 'application/json', ...CORS_HEADERS } },
-    );
-  }
+  // Refused before it counts against the limit, as before handleMcp was split out.
+  if (!originAllowed(req.headers.get('origin'))) return forbiddenOrigin();
   // x-real-ip is set by Vercel from the TCP connection and is not client-
   // spoofable; x-forwarded-for's leftmost entry is the documented fallback.
   // If a proxy ever fronts this deployment, switch to x-vercel-forwarded-for.
@@ -201,16 +224,7 @@ async function withLimit(req: Request): Promise<Response> {
       },
     );
   }
-  const refusal = await refuseHtml(req);
-  if (refusal) return refusal;
-  const response = await mcp(req);
-  const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  return handleMcp(req);
 }
 
 export { withLimit as GET, withLimit as POST, withLimit as DELETE, handleOptions as OPTIONS };

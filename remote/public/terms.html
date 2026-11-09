@@ -14,7 +14,7 @@
 </head>
 <body>
   <h1>Terms of Use</h1>
-  <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
+  <p><em>Service: Page2AI MCP hosted endpoint (<code>page2ai.igorsaevets.com</code>; until the move is complete also <code>page2ai-mcp-remote.vercel.app</code>). Effective: 2026-08-30.</em></p>
 
   <h2>The service</h2>
   <p>
@@ -46,7 +46,8 @@
 
   <h2>Limits</h2>
   <p>
-    Per-IP rate limits apply (in the application and at the platform firewall).
+    Per-client rate limits apply, and a limit on conversions running at once;
+    pages are fetched only on ports 80 and 443. Abuse reports (for example, a site owner who sees unwanted requests from this service): <a href="mailto:support@igorsaevets.com">support@igorsaevets.com</a>, with the time and the site's hostname; requests from this service carry the user agent <code>page2ai-core/&lt;version&gt;</code> with a link to its source.
     Responses are capped at 10&nbsp;MB with enforced timeouts; requests to private
     network ranges, loopback and cloud metadata endpoints are refused.
   </p>

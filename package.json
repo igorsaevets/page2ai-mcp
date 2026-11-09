@@ -25,7 +25,7 @@
     "build": "tsc -p tsconfig.build.json && node -e \"import('node:fs').then(({chmodSync})=>chmodSync('dist/index.js',0o755))\"",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "start": "node dist/index.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"remote/**\"",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test",
     "probe": "node scripts/probe-protocol.mjs node dist/index.js"

@@ -1,21 +1,23 @@
 {
   "name": "page2ai-mcp-remote",
   "private": true,
-  "version": "0.1.3",
-  "description": "Hosted (Streamable HTTP) variant of the Page2AI MCP server, deployed on Vercel. Same tool implementation as the local stdio server.",
+  "version": "0.2.0",
+  "description": "Hosted (Streamable HTTP) variant of the Page2AI MCP server: a Vercel function (api/mcp.ts) and a container (server.mts, Dockerfile). Same tool implementation as the local stdio server.",
   "type": "module",
   "engines": {
     "node": ">=20.18.1"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
+    "start": "node server.mts",
+    "test": "node --test \"tests/*.test.mts\"",
     "dev:local": "tsx scripts/local-serve.mts",
     "smoke": "node scripts/smoke-remote.mjs",
     "smoke:native": "node scripts/smoke-native.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@page2ai/core": "^0.4.0",
+    "@page2ai/core": "^0.4.3",
     "@page2ai/mcp": "^0.10.0",
     "mcp-handler": "^2.1.1",
     "zod": "^4.2.0"
