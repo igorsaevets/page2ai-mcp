@@ -69,6 +69,15 @@ use it and what to do with signed-in, blocked and very long pages (Claude Code 2
 It asks for one optional, secret setting, the Agent Bridge key (see below). In `claude -p` runs allow the
 tool by name: `--allowedTools "mcp__plugin_page2ai_page2ai__page_to_markdown"`.
 
+The repository holds two plugins, both named `page2ai`:
+
+| Folder | Server | Installed from |
+|---|---|---|
+| `plugins/page2ai-local` | this server on your computer, through `npx` pinned to one release, with the optional Agent Bridge | this repository's marketplace (the command above) |
+| `plugins/page2ai` | the hosted endpoint `https://page2ai.igorsaevets.com/api/mcp`: nothing to install, no Agent Bridge, no `html` input, no parts; each URL goes to the author's server ([privacy](https://page2ai.igorsaevets.com/privacy.html)) | the Claude plugin directory, once its review passes; the directory accepts a local server only from organizations Anthropic has Verified |
+
+The hosted plugin's tool is `mcp__plugin_page2ai_page2ai-hosted__page_to_markdown`.
+
 ### Claude Desktop
 
 One-click bundle: download `page2ai-mcp-<version>.mcpb` from the

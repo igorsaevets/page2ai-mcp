@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "page2ai",
-      "source": "./plugins/page2ai",
+      "source": "./plugins/page2ai-local",
       "description": "Web page to clean Markdown for agents: the page2ai-mcp server plus a skill that says when to use it and what to do with signed-in, blocked and very long pages."
     }
   ]

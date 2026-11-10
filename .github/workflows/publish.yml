@@ -182,11 +182,13 @@ jobs:
           fi
 
       - name: Check the Claude Code plugin's pinned server
+        # plugins/page2ai-local is the local plugin our marketplace installs as `page2ai`;
+        # plugins/page2ai is the hosted variant the Claude directory reads, with no npx pin.
         run: |
-          PIN="$(node -p "require('./plugins/page2ai/.claude-plugin/plugin.json').mcpServers.page2ai.args.join(' ')")"
+          PIN="$(node -p "require('./plugins/page2ai-local/.claude-plugin/plugin.json').mcpServers.page2ai.args.join(' ')")"
           MAIN="$(node -p "require('./package.json').version")"
           if [ "$PIN" != "-y page2ai-mcp@$MAIN" ]; then
-            echo "::error::plugins/page2ai/.claude-plugin/plugin.json runs npx '$PIN'; expected '-y page2ai-mcp@$MAIN'"
+            echo "::error::plugins/page2ai-local/.claude-plugin/plugin.json runs npx '$PIN'; expected '-y page2ai-mcp@$MAIN'"
             exit 1
           fi
 
