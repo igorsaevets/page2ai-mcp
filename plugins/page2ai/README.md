@@ -1,53 +1,46 @@
 # Page2AI for Claude
 
-Page2AI converts a web page to clean Markdown for Claude. Code blocks keep their language, tables stay tables, tab panels come out as separate sections, and navigation menus are dropped. Give it a URL, or the HTML of a page that a browser tool already has open, and Claude gets the page's full text instead of a summary.
+Page2AI converts a web page to clean Markdown for Claude. Code blocks keep their language, tables stay tables, tab panels come out as separate sections, and navigation menus are dropped. Give it a URL and Claude gets the page's full text instead of a summary; add a query and only the sections that match come back.
 
-The plugin adds one tool, `page_to_markdown`, and a skill that tells Claude when to use it, what to do when a site refuses the request, and how to read a long page in parts. A long page comes back in parts of about 8,000 tokens, the first one listing the page's sections, so Claude can read only the section it needs.
+The plugin adds one tool, `page_to_markdown`, served by the hosted Page2AI MCP server, and a skill that tells Claude when to use it, what to do when a site refuses the request, and how to read only the part of a long page it needs.
 
 ## Where it works
 
-| Surface | What loads |
+| App | What loads |
 |---|---|
 | Claude Code | the tool and the skill |
-| Cowork, in a session that runs on your computer | the tool and the skill, without the Agent Bridge (Cowork does not ask for plugin options) |
-| claude.ai chat | the skill only: chat does not start local MCP servers, so the tool is not there |
+| Cowork | the skill; connect the server once from the plugin's Connectors tab to get the tool |
+| claude.ai chat (web, desktop, mobile) | the skill; connect the server once from the plugin's Connectors tab to get the tool |
 
-The server needs Node.js 20 or later on your computer, for `npx`.
-
-To install it in Claude Code from this repository's own marketplace:
-
-```
-/plugin install page2ai --marketplace igorsaevets/page2ai-mcp
-```
+Nothing is installed on your computer: the plugin points Claude at `https://page2ai.igorsaevets.com/api/mcp`. The server needs no account and no key.
 
 ## Examples
 
 - "Read https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap with Page2AI and show me its code examples."
 - "Convert https://docs.python.org/3/library/json.html to Markdown with Page2AI and list the functions it documents, with their signatures."
+- "Use Page2AI with the query 'removeprefix' on https://docs.python.org/3/library/stdtypes.html and tell me what that method does."
 - "Save https://en.wikipedia.org/wiki/Markdown as Markdown in markdown-article.md, using Page2AI."
-- With a browser tool open on a page: "Take this page's HTML and convert it with Page2AI, passing the page's URL too."
 
-## What it runs, fetches and sends
+## What it sends, fetches and keeps
 
-- **Runs** the open-source page2ai-mcp server on your computer through `npx`, pinned to one release in the plugin's manifest. When that release is not in npm's cache yet, npx downloads it and its dependencies from the npm registry.
-- **Fetches** each page Claude asks for, directly from your computer, with a plain HTTP request: no cookies, no page scripts. Private, loopback and cloud-metadata addresses are refused.
-- **Listens** on 127.0.0.1, port 3025, reachable from your computer only, for the Page2AI browser extension's Agent Bridge. Without a bridge key it refuses every connection.
-- **Keeps** a long page's Markdown in the server's memory while Claude reads it in parts, until 10 minutes after the last part was read or until the server stops. Nothing is written to disk.
-- **Sends** nothing anywhere else: no telemetry, no analytics, no account. The Markdown goes only to the Claude session that called the tool.
+- **Sends** each URL Claude asks for, with the call's options, to the hosted Page2AI server at page2ai.igorsaevets.com, run by the plugin's author. Requests pass through Cloudflare.
+- **Fetches** the page from that server with a plain HTTP request: no cookies, no page scripts, the standard web ports only. Private, loopback and cloud-metadata addresses are refused, so pages on your own network are out of reach.
+- **Keeps** nothing after the answer. The server logs one line per request: the time, the status, how long it took, the page's hostname (never the full URL or the page) and a pseudonymous client tag that changes on every restart. The proxies in front of it keep standard access logs (client IP address, user agent, timing) until they rotate. The [privacy policy](https://page2ai.igorsaevets.com/privacy.html) has the details.
+- **Limits** each client to about 30 calls a minute and converts a few pages at once; past that it answers "Rate limited" or "busy", and Claude waits and retries.
 
-## Optional: open pages in your own browser (Agent Bridge)
+Do not ask it to open links that carry a password, a token or a signed download parameter: the link goes to the hosted server and to the site.
 
-Pages behind a sign-in, or rendered by JavaScript, come back empty or refused when the server fetches them. With the Agent Bridge, the server asks the Page2AI Chrome extension to open the page in a background tab of your browser, with your cookies, and returns that page's Markdown.
+## What it cannot do
 
-1. Install the Page2AI extension 1.6.0 or later from the Chrome Web Store (extension ID dlpaaijcnbbmlfeohlphjpnbbcnomnno).
-2. In its popup, turn on Agent Bridge, allow site access, and press Copy key.
-3. In Claude Code, paste the key into this plugin's `bridge_key` option, then restart Claude Code so the server starts with it.
+- Pages behind a sign-in, or rendered only by JavaScript, come back as their login page or with little content. Read those with a browser tool.
+- Pages on localhost or an intranet, and HTML you already have, are not inputs this server takes.
 
-Leave `bridge_key` empty to use the plugin without the extension.
+Page2AI's open-source local server and browser extension do these on your own computer; the repository's README explains them: https://github.com/igorsaevets/page2ai-mcp
 
 ## Links
 
 - Documentation: https://igorsaevets.github.io/page2ai-docs/mcp/
-- Privacy policy: https://igorsaevets.github.io/page2ai-docs/privacy/
+- Privacy policy of the hosted server: https://page2ai.igorsaevets.com/privacy.html
+- Terms: https://page2ai.igorsaevets.com/terms.html
 - Source and issues: https://github.com/igorsaevets/page2ai-mcp
 - License: MIT

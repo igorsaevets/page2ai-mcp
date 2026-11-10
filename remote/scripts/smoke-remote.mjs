@@ -119,7 +119,7 @@ assert.strictEqual(schemaSha, 'c8edc8eb6b04', 'inputSchema JSON differs from the
 assert.strictEqual(ptm.title, 'Convert Page to Markdown', 'title differs');
 assert.deepStrictEqual(ptm.annotations,
   { readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false }, 'annotations differ');
-console.log(`tools/list contract ok: description ${descSha}, inputSchema ${schemaSha}, properties url + 3`);
+console.log(`tools/list contract ok: description ${descSha}, inputSchema ${schemaSha}, properties ${Object.keys(ptm.inputSchema.properties).join(', ')}`);
 const htmlOnly = await rpc('tools/call', { name: 'page_to_markdown', arguments: { html: '<p>x</p>' } }).catch((e) => ({ thrown: String(e) }));
 assert.ok(htmlOnly.thrown || htmlOnly.isError === true, `html without url must be refused here: ${JSON.stringify(htmlOnly).slice(0, 200)}`);
 console.log('html without url refused ok');
