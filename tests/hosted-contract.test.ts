@@ -13,9 +13,18 @@ import {
 const sha12 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 12);
 
 describe('hosted page_to_markdown = the contract reviewed for the ChatGPT plugin', () => {
+  // 2026-11-22 (Claude directory, connector review): the reviewed copy (2b2d5ad05e9e, 996 chars)
+  // minus «; read those through a browser tool instead», the only words naming another tool.
+  // remote/api/mcp.ts patches the published 0.10.1 copy to these same bytes; its test pins this sha.
   it('keeps the reviewed description byte for byte', () => {
     const d = pageToMarkdownHostedDefinition.description;
-    expect([sha12(d), d.length]).toEqual(['2b2d5ad05e9e', 996]);
+    expect([sha12(d), d.length]).toEqual(['777959437edc', 953]);
+  });
+
+  it('names no other tool and keeps what a sign-in page returns', () => {
+    const d = pageToMarkdownHostedDefinition.description;
+    expect(d).not.toMatch(/browser tool|instead\.|use another/i);
+    expect(d).toContain('comes back as its login page or with no content. It requests only the URL given');
   });
 
   it('takes a url, query and the three options, and nothing else', () => {
@@ -35,8 +44,10 @@ describe('hosted page_to_markdown = the contract reviewed for the ChatGPT plugin
     expect(pageToMarkdownHostedDefinition.name).toBe('page_to_markdown');
     expect(pageToMarkdownHostedDefinition.title).toBe('Convert Page to Markdown');
     expect(pageToMarkdownHostedDefinition.annotations).toEqual({
+      title: 'Convert Page to Markdown',
       readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false,
     });
+    expect(pageToMarkdownDefinition.annotations.title).toBe(pageToMarkdownDefinition.title);
   });
 
   it('local description names html and Agent Bridge and keeps the page-only sentence', () => {

@@ -52,6 +52,11 @@ const TYPES: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.json': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
+  // The site icon: the Claude directory and Claude show the favicon of the server's URL as the
+  // connector's icon (portal, «Icon», 2026-11-22).
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
 };
 const staticFiles = new Map<string, StaticFile>();
 const loadStatic = (dir: string): void => {

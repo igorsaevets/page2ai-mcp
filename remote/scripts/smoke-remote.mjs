@@ -103,11 +103,16 @@ console.log(`tools/list ok: ${names.join(', ')}`);
 
 // 3b. the ChatGPT plugin runs whatever this endpoint lists: it must stay the reviewed
 // contract plus `query` (mcp 0.10.1, 2026-11-03: description sha256 2b2d5ad05e9e, 996 chars;
-// url, query and three options; was 783d1e41f68e / 898 without query).
+// url, query and three options; was 783d1e41f68e / 898 without query), minus the sentence naming
+// a browser tool and plus `annotations.title` (2026-11-22, the Claude directory's connector
+// review: 777959437edc, 953 chars; api/mcp.ts). An endpoint built from a tree before that change
+// (Vercel while main is frozen) still lists 2b2d5ad05e9e: --reviewed-2026-11-03 accepts that copy.
 const ptm = tools.tools.find((t) => t.name === 'page_to_markdown');
 const { createHash } = await import('node:crypto');
 const descSha = createHash('sha256').update(ptm.description, 'utf8').digest('hex').slice(0, 12);
-assert.deepStrictEqual([descSha, ptm.description.length], ['2b2d5ad05e9e', 996], 'description differs from the reviewed copy');
+const OLD_COPY = cliArgs.includes('--reviewed-2026-11-03');
+assert.deepStrictEqual([descSha, ptm.description.length], OLD_COPY ? ['2b2d5ad05e9e', 996] : ['777959437edc', 953],
+  'description differs from the reviewed copy');
 assert.deepStrictEqual(Object.keys(ptm.inputSchema.properties ?? {}),
   ['url', 'query', 'include_images', 'include_frontmatter', 'timeout_ms'], 'input properties differ from the reviewed contract');
 assert.deepStrictEqual(ptm.inputSchema.required, ['url'], 'url must stay required');
@@ -118,8 +123,27 @@ const schemaSha = createHash('sha256').update(JSON.stringify(ptm.inputSchema), '
 assert.strictEqual(schemaSha, 'c8edc8eb6b04', 'inputSchema JSON differs from the copy pinned on 2026-11-09');
 assert.strictEqual(ptm.title, 'Convert Page to Markdown', 'title differs');
 assert.deepStrictEqual(ptm.annotations,
-  { readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false }, 'annotations differ');
+  { ...(OLD_COPY ? {} : { title: 'Convert Page to Markdown' }), readOnlyHint: true, openWorldHint: true, idempotentHint: false, destructiveHint: false },
+  'annotations differ');
 console.log(`tools/list contract ok: description ${descSha}, inputSchema ${schemaSha}, properties ${Object.keys(ptm.inputSchema.properties).join(', ')}`);
+// 3c. the site icon: Claude shows the favicon of the connector's URL as its icon (2026-11-22).
+const iconOrigin = new URL(ENDPOINT).origin;
+const localNoStatic = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(ENDPOINT).hostname)
+  && (await fetch(iconOrigin + '/').catch(() => ({ status: 0 }))).status !== 200;
+if (localNoStatic) console.log('site icon skipped: this local server has no static files (scripts/local-serve.mts)');
+if (!OLD_COPY && !localNoStatic) {
+  const origin = iconOrigin;
+  for (const [path, type] of [['/favicon.ico', /^image\/(x-icon|vnd\.microsoft\.icon)/], ['/favicon.svg', /^image\/svg\+xml/],
+    ['/icon-192.png', /^image\/png/], ['/apple-touch-icon.png', /^image\/png/]]) {
+    const r = await fetch(origin + path);
+    const body = Buffer.from(await r.arrayBuffer());
+    assert.ok(r.status === 200 && type.test(r.headers.get('content-type') ?? '') && body.length > 300,
+      `${path}: ${r.status} ${r.headers.get('content-type')} ${body.length} B`);
+  }
+  const home = await (await fetch(origin + '/')).text();
+  assert.ok(home.includes('<link rel="icon" href="/favicon.ico"'), 'the home page does not link the favicon');
+  console.log('site icon ok: favicon.ico, favicon.svg, icon-192.png, apple-touch-icon.png, linked from /');
+}
 const htmlOnly = await rpc('tools/call', { name: 'page_to_markdown', arguments: { html: '<p>x</p>' } }).catch((e) => ({ thrown: String(e) }));
 assert.ok(htmlOnly.thrown || htmlOnly.isError === true, `html without url must be refused here: ${JSON.stringify(htmlOnly).slice(0, 200)}`);
 console.log('html without url refused ok');
