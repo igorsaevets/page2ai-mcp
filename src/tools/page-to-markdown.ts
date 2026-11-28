@@ -155,7 +155,10 @@ export const pageToMarkdownDefinition = {
     },
     additionalProperties: false,
   },
+  // `title` here as well as at the top level: the Claude directory's connector checklist flags a
+  // tool whose annotations carry no title (claude.com/docs/connectors/building/submission, 2026-11-22).
   annotations: {
+    title: 'Convert Page to Markdown',
     readOnlyHint: true,
     openWorldHint: true,
     idempotentHint: false,   // the fetched page may change between calls
@@ -194,9 +197,12 @@ export const pageToMarkdownHostedDefinition = {
     'Fetch a web page URL and convert it to clean Markdown optimized for LLM context. ' +
     'Preserves headings, code blocks (with language hints), links, and tables; keeps the ' +
     'main content and drops navigation, headers, footers, and sidebars. ' +
+    // The sign-in sentence states what comes back and no longer names another tool to use: the
+    // Claude directory asks for descriptions with no instructions about other tools (review
+    // criteria, «Avoid prompt-injection patterns»; 2026-11-22). remote/api/mcp.ts applies the same
+    // change to the copy it imports from the published package until a release carries this one.
     'It fetches without cookies and runs no page scripts, so a page behind a sign-in or one ' +
-    'rendered only by JavaScript comes back as its login page or with no content; read those ' +
-    'through a browser tool instead. ' +
+    'rendered only by JavaScript comes back as its login page or with no content. ' +
     'It requests only the URL given, as a browser opens a page, so docs sites return the page ' +
     'itself, not a Markdown copy of it; a URL that names a Markdown or text file (a raw GitHub ' +
     'README.md, an llms.txt) comes back as written. ' +

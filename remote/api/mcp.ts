@@ -7,10 +7,26 @@ import { createMcpHandler } from 'mcp-handler';
 // The hosted definition is the contract the ChatGPT plugin was reviewed with (a URL only,
 // no Agent Bridge); the local server's own definition also takes `html` and names the bridge.
 import {
-  pageToMarkdownHostedDefinition,
+  pageToMarkdownHostedDefinition as publishedHostedDefinition,
   pageToMarkdownHostedInputSchema,
   handlePageToMarkdown,
 } from '@page2ai/mcp/dist/tools/page-to-markdown.js';
+
+// The definition this endpoint lists. The published package (0.10.1) still carries two things the
+// Claude directory's connector review flags, fixed in the repo's src for the next release: no
+// `annotations.title` (the checklist wants it even beside a top-level `title`), and a sentence that
+// names another tool («read those through a browser tool instead»; the compliance step confirms that
+// descriptions hold no instructions about other tools). Both edits are no-ops on a package that has
+// them. tests/hosted-definition.test.mts pins the result to the src copy's sha (777959437edc).
+export const OTHER_TOOL_SENTENCE = '; read those through a browser tool instead.';
+export const patchHostedDefinition = <
+  T extends { title: string; description: string; annotations: Record<string, unknown> },
+>(d: T): T => ({
+  ...d,
+  description: d.description.replace(OTHER_TOOL_SENTENCE, '.'),
+  annotations: { title: d.title, ...d.annotations },
+});
+export const pageToMarkdownHostedDefinition = patchHostedDefinition(publishedHostedDefinition);
 
 // A public endpoint that fetches arbitrary URLs is an open fetch-proxy by
 // definition, so it rate-limits itself even before any platform WAF rules.

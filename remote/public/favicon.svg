@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Page2AI">
+  <rect width="128" height="128" rx="28" ry="28" fill="#4f46e5"/>
+  <!-- Bold "M" — safe area 16..112 -->
+  <path d="M 24 68 L 24 16 L 40 16 L 64 46 L 88 16 L 104 16 L 104 68 L 88 68 L 88 40 L 68 62 L 60 62 L 40 40 L 40 68 Z" fill="#ffffff"/>
+  <!-- Down arrow (Markdown extraction cue) -->
+  <path d="M 58 76 L 70 76 L 70 90 L 82 90 L 64 108 L 46 90 L 58 90 Z" fill="#ffffff"/>
+</svg>
